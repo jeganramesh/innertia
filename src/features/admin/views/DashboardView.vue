@@ -10,64 +10,58 @@
     <!-- System Metrics Cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
       <Card>
-        <h3 class="font-semibold text-lg text-gray-700">Total Users</h3>
+        <h3 class="font-semibold text-lg text-gray-700">Total Students</h3>
         <p class="text-3xl font-bold text-primary mt-2">1,234</p>
       </Card>
       <Card>
-        <h3 class="font-semibold text-lg text-gray-700">Active Courses</h3>
-        <p class="text-3xl font-bold text-success mt-2">87</p>
+        <h3 class="font-semibold text-lg text-gray-700">Upcoming Exams</h3>
+        <p class="text-3xl font-bold text-info mt-2">5</p>
       </Card>
       <Card>
-        <h3 class="font-semibold text-lg text-gray-700">Total Quizzes</h3>
-        <p class="text-3xl font-bold text-warning mt-2">256</p>
+        <h3 class="font-semibold text-lg text-gray-700">Active Exams</h3>
+        <p class="text-3xl font-bold text-success mt-2">2</p>
       </Card>
       <Card>
-        <h3 class="font-semibold text-lg text-gray-700">Storage Used</h3>
-        <p class="text-3xl font-bold text-info mt-2">1.2 TB</p>
+        <h3 class="font-semibold text-lg text-gray-700">Completed Exams</h3>
+        <p class="text-3xl font-bold text-warning mt-2">15</p>
       </Card>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <!-- User Management Interface -->
+      <!-- Student Management -->
       <Card>
-        <h3 class="font-semibold text-xl text-gray-700 mb-4">User Management</h3>
-        <EmptyState title="Manage Users" message="View, edit, and delete user accounts." />
-        <Button class="mt-4" @click="notification.info('User management page coming soon!')">Go to User Management</Button>
+        <h3 class="font-semibold text-xl text-gray-700 mb-4">Student Management</h3>
+        <EmptyState title="Manage Students" message="View, enroll, and manage student accounts." />
+        <Button class="mt-4" @click="notification.info('Student management page coming soon!')">Go to Student Management</Button>
       </Card>
 
-      <!-- Role Assignment Controls -->
+      <!-- Faculty Management -->
       <Card>
-        <h3 class="font-semibold text-xl text-gray-700 mb-4">Role Assignment</h3>
-        <EmptyState title="Assign Roles" message="Control user permissions and roles." />
-        <Button class="mt-4" @click="notification.info('Role assignment controls coming soon!')">Manage Roles</Button>
+        <h3 class="font-semibold text-xl text-gray-700 mb-4">Faculty Management</h3>
+        <EmptyState title="Manage Faculty" message="View, add, and manage faculty accounts." />
+        <Button class="mt-4" @click="notification.info('Faculty management page coming soon!')">Go to Faculty Management</Button>
       </Card>
 
-      <!-- Platform Settings Page -->
+      <!-- Exam Management -->
       <Card>
-        <h3 class="font-semibold text-xl text-gray-700 mb-4">Platform Settings</h3>
-        <EmptyState title="Configure Settings" message="Adjust platform-wide settings." />
-        <Button class="mt-4" @click="notification.info('Platform settings page coming soon!')">Go to Settings</Button>
+        <h3 class="font-semibold text-xl text-gray-700 mb-4">Exam Management</h3>
+        <EmptyState title="Manage Exams" message="Create, schedule, and oversee exams." />
+        <Button class="mt-4" @click="notification.info('Exam management page coming soon!')">Go to Exam Management</Button>
       </Card>
+    </div>
 
-      <!-- System Analytics -->
+    <!-- Recent Activity -->
+    <div class="mt-8">
       <Card>
-        <h3 class="font-semibold text-xl text-gray-700 mb-4">System Analytics</h3>
-        <EmptyState title="View Analytics" message="Monitor platform performance and usage." />
-        <Button class="mt-4" @click="notification.info('System analytics page coming soon!')">View Analytics</Button>
-      </Card>
-
-      <!-- Audit Logs Viewer -->
-      <Card class="lg:col-span-2">
-        <h3 class="font-semibold text-xl text-gray-700 mb-4">Audit Logs</h3>
-        <EmptyState title="No Recent Logs" message="Track system activities and changes." />
-        <Button class="mt-4" @click="notification.info('Audit logs viewer coming soon!')">View All Logs</Button>
-      </Card>
-
-      <!-- Batch Operations -->
-      <Card class="lg:col-span-2">
-        <h3 class="font-semibold text-xl text-gray-700 mb-4">Batch Operations</h3>
-        <EmptyState title="No Batch Operations" message="Perform bulk actions on users, courses, etc." />
-        <Button class="mt-4" @click="notification.info('Batch operations coming soon!')">Run Batch Operation</Button>
+        <h3 class="font-semibold text-xl text-gray-700 mb-4">Recent Activity</h3>
+        <ul class="space-y-2">
+          <li class="text-gray-700">User 'John Doe' created a new quiz "Math Basics". <span class="text-gray-500 text-sm">2 minutes ago</span></li>
+          <li class="text-gray-700">Faculty 'Jane Smith' updated lesson "Algebra I". <span class="text-gray-500 text-sm">1 hour ago</span></li>
+          <li class="text-gray-700">Student 'Alice Brown' completed quiz "History Exam". <span class="text-gray-500 text-sm">3 hours ago</span></li>
+          <li class="text-gray-700">College Admin 'Admin User' added new faculty 'Dr. Evans'. <span class="text-gray-500 text-sm">Yesterday</span></li>
+        </ul>
+        <EmptyState title="No Recent Activity" message="No recent activities to display." v-if="false" />
+        <Button class="mt-4" @click="notification.info('Recent activity logs coming soon!')">View All Activity</Button>
       </Card>
     </div>
   </div>
