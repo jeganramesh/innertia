@@ -128,19 +128,17 @@ const stats = computed(() => ({
 
 const navGroups = [
   {
-    title: 'Learning',
+    title: 'Management', // Changed title from 'Learning' to 'Management'
     items: [
-      { name: 'Dashboard', to: '/', icon: HomeIcon },
-      { name: 'Courses', to: '/courses', icon: BookOpenIcon, badge: '5' },
-      { name: 'Quizzes', to: '/quizzes', icon: TrophyIcon, badge: '3' },
-      { name: 'AI Tutor', to: '/chat', icon: ChatBubbleLeftRightIcon },
+      { name: 'Dashboard', to: '/admin/dashboard', icon: HomeIcon }, // Point to admin dashboard
+      { name: 'Courses', to: '/courses', icon: BookOpenIcon }, // Keep for course overview
+      { name: 'AI Tutor', to: '/chat', icon: ChatBubbleLeftRightIcon }, // Keep for AI interaction/oversight
     ]
   },
   {
-    title: 'Community',
+    title: 'Reporting', // Changed title from 'Community' to 'Reporting'
     items: [
-      { name: 'Leaderboard', to: '/leaderboard', icon: PresentationChartLineIcon },
-      { name: 'Classmates', to: '/users', icon: UsersIcon },
+      { name: 'Leaderboard', to: '/leaderboard', icon: PresentationChartLineIcon }, // Keep for general overview
     ]
   },
   {

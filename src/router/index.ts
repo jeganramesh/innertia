@@ -7,11 +7,6 @@ const routes = [
     component: () => import('@/views/HomeView.vue')
   },
   {
-    path: '/dashboard',
-    name: 'dashboard',
-    component: () => import('@/features/student/views/DashboardView.vue')
-  },
-  {
     path: '/courses',
     name: 'courses',
     component: () => import('@/features/course/views/CoursesView.vue')
@@ -26,31 +21,6 @@ const routes = [
     path: '/login',
     name: 'login',
     component: () => import('@/features/auth/views/LoginView.vue')
-  },
-  {
-    path: '/teacher/dashboard',
-    name: 'teacher-dashboard',
-    component: () => import('@/features/teacher/views/DashboardView.vue')
-  },
-  {
-    path: '/teacher/classes',
-    name: 'teacher-manage-class',
-    component: () => import('@/features/teacher/views/ManageClassView.vue')
-  },
-  {
-    path: '/teacher/classes/:id/analytics',
-    name: 'teacher-class-analytics',
-    component: () => import('@/features/teacher/views/ClassAnalyticsView.vue')
-  },
-  {
-    path: '/teacher/lessons/create',
-    name: 'teacher-create-lesson',
-    component: () => import('@/features/teacher/views/CreateLessonView.vue')
-  },
-  {
-    path: '/teacher/quizzes/create',
-    name: 'teacher-create-quiz',
-    component: () => import('@/features/teacher/views/CreateQuizView.vue')
   },
   {
     path: '/courses/:id/lesson/:lessonId',
