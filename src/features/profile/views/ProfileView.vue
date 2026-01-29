@@ -121,7 +121,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRoute } from 'vue-router'; // Assuming current user's profile, route param might not be needed
 import { useFetch } from '@/composables/useFetch';
-import ProfileHeader from '@/components/profile/ProfileHeader.vue';
+import ProfileHeader from '@/features/profile/components/ProfileHeader.vue';
 import Card from '@/components/common/Card.vue';
 import Button from '@/components/common/Button.vue';
 import Spinner from '@/components/common/Spinner.vue';
