@@ -21,8 +21,11 @@ A production-ready authentication system for the Innertia Placement Shell platfo
    ```bash
    docker-compose up -d
    ```
+   ```bash
+   docker exec innertia_backend python -m app.scripts.create_test_users
+   ```
 
-3. **Access the application**
+4. **Access the application**
    - Frontend: http://localhost:3000
    - Backend API: http://localhost:8000
    - API Documentation: http://localhost:8000/api/docs
