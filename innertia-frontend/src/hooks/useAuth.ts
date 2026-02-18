@@ -62,14 +62,17 @@ export const useAuth = (): UseAuthReturn => {
     
     try {
       const response = await authService.login(credentials);
+      console.log('Login response:', response);
       setUser(response.user);
       authService.storeUser(response.user);
       
       // Redirect to role-based dashboard
       const redirectTo = getRoleBasedRoute(response.user.role);
+      console.log('Redirecting to:', redirectTo);
       const from = location.state?.from?.pathname || redirectTo;
       navigate(from, { replace: true });
     } catch (err: any) {
+      console.error('Login catch error:', err);
       const message = err.response?.data?.detail || 'Login failed. Please try again.';
       setError(message);
       throw new Error(message);

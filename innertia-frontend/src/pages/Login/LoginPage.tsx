@@ -58,36 +58,20 @@ const LoginPage: React.FC = () => {
               error={error}
             />
           </div>
-          
-          {/* Footer Links */}
-          <div className="mt-8 text-center">
-            <p className="text-sm text-gray-500">
-              By continuing, you agree to our{' '}
-              <a href="#" className="text-gray-900 hover:underline">
-                Terms of Service
-              </a>{' '}
-              and{' '}
-              <a href="#" className="text-gray-900 hover:underline">
-                Privacy Policy
-              </a>
-            </p>
-          </div>
         </div>
       </main>
       
       {/* Footer */}
       <footer className="py-6 px-6">
         <div className="max-w-md mx-auto">
-          <div className="flex items-center justify-between text-sm text-gray-400">
-            <span>© 2024 Innertia Placement Shell</span>
-            <div className="space-x-4">
+          <div className="flex items-center justify-center text-sm text-gray-400">
               <a href="#" className="hover:text-gray-600 transition-colors">
                 Help
               </a>
+              <span className="mx-3">·</span>
               <a href="#" className="hover:text-gray-600 transition-colors">
                 Privacy
               </a>
-            </div>
           </div>
         </div>
       </footer>

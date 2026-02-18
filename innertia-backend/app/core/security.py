@@ -35,10 +35,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
 def setup_cors(app: FastAPI) -> None:
     """Configure CORS middleware."""
+    # For development, allow all origins. In production, use settings.CORS_ORIGINS
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.CORS_ORIGINS,
-        allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
+        allow_origins=["*"],  # Allow all for development
+        allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )

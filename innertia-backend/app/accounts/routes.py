@@ -5,7 +5,7 @@ Handles user registration, login, token refresh, logout, and user info.
 
 from datetime import timedelta
 from jose import JWTError
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -253,14 +253,14 @@ async def refresh_token(token_refresh: TokenRefresh, db: AsyncSession = Depends(
     }
 )
 async def logout(
-    current_user: User = Depends(get_current_active_user),
-    credentials = Depends(Depends)
+    request: Request,
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Logout user by blacklisting their access token and revoking refresh token.
     """
     # Get the authorization header
-    auth_header = credentials.headers.get("Authorization") if credentials else None
+    auth_header = request.headers.get("Authorization")
     
     if auth_header and auth_header.startswith("Bearer "):
         access_token = auth_header.split(" ")[1]

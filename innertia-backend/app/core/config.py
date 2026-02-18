@@ -4,8 +4,11 @@ Loads environment variables using Pydantic Settings.
 """
 
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 from functools import lru_cache
-from typing import List
+from typing import List, Union
+import json
+import ast
 
 
 class Settings(BaseSettings):
@@ -30,11 +33,28 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
     
     # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
+    CORS_ORIGINS: Union[List[str], str] = ["http://localhost:3000", "http://localhost:5173"]
     CORS_ALLOW_CREDENTIALS: bool = True
     
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE: int = 100
+    
+    @field_validator('CORS_ORIGINS', mode='before')
+    @classmethod
+    def parse_cors_origins(cls, v):
+        """Parse CORS_ORIGINS from string to list."""
+        if isinstance(v, str):
+            try:
+                # Try JSON format first
+                return json.loads(v)
+            except json.JSONDecodeError:
+                try:
+                    # Try Python literal format
+                    return ast.literal_eval(v)
+                except (ValueError, SyntaxError):
+                    # Return as single origin
+                    return [v]
+        return v
     
     class Config:
         env_file = ".env"

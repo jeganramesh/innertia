@@ -36,14 +36,14 @@ const NavSection = memo(({ title, items, isCollapsed }: NavSectionProps) => {
   const location = useLocation();
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-0.5">
       {title && !isCollapsed && (
-        <h3 className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+        <h3 className="px-3 text-[11px] font-semibold text-[#86868b] uppercase tracking-[0.5px] mb-3">
           {title}
         </h3>
       )}
       <nav aria-label={title || 'Navigation'}>
-        <ul className="space-y-1">
+        <ul className="space-y-0.5">
           {items.map((item) => {
             const isActive = location.pathname.startsWith(item.path);
             return (
@@ -52,11 +52,11 @@ const NavSection = memo(({ title, items, isCollapsed }: NavSectionProps) => {
                   to={item.path}
                   className={twMerge(
                     clsx(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ease-in-out',
-                      'text-sm font-medium',
+                      'flex items-center gap-3 px-3 py-2.5 rounded-[10px] transition-all duration-200 ease-out',
+                      'text-[13px] font-normal',
                       isActive
-                        ? 'bg-blue-50 text-blue-700 border-l-2 border-blue-700'
-                        : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900',
+                        ? 'bg-[#f5f5f7] text-black'
+                        : 'text-[#1d1d1f] hover:bg-[#f5f5f7]',
                       isCollapsed && 'justify-center px-2'
                     )
                   )}
@@ -66,7 +66,7 @@ const NavSection = memo(({ title, items, isCollapsed }: NavSectionProps) => {
                   <span
                     className={clsx(
                       'flex-shrink-0',
-                      isActive && 'text-blue-700',
+                      isActive && 'text-black',
                       isCollapsed && 'mx-auto'
                     )}
                   >
@@ -76,7 +76,7 @@ const NavSection = memo(({ title, items, isCollapsed }: NavSectionProps) => {
                     <>
                       <span className="flex-1 truncate">{item.label}</span>
                       {item.badge && (
-                        <span className="flex-shrink-0 bg-blue-100 text-blue-700 text-xs font-medium px-2 py-0.5 rounded-full min-w-[1.5rem] text-center">
+                        <span className="flex-shrink-0 bg-[#0071e3] text-white text-[11px] font-medium px-2 py-0.5 rounded-full min-w-[1.5rem] text-center">
                           {item.badge}
                         </span>
                       )}
@@ -166,13 +166,13 @@ export const Sidebar = memo(({ className, onCollapseChange }: SidebarProps) => {
         />
       )}
 
-      {/* Sidebar with Apple-inspired design */}
+      {/* Sidebar with Apple-inspired minimal design */}
       <aside
         className={twMerge(
           clsx(
-            'left-0 top-0 z-50 h-screen bg-white border-r border-slate-200 transition-all duration-300 ease-in-out',
-            'flex flex-col shadow-sm',
-            isCollapsed ? 'w-16' : 'w-64',
+            'left-0 top-0 z-50 h-screen bg-white transition-all duration-300 ease-out',
+            'flex flex-col',
+            isCollapsed ? 'w-[72px]' : 'w-[272px]',
             isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
             'select-none', // Apple-like non-selectable UI
             className
@@ -181,44 +181,44 @@ export const Sidebar = memo(({ className, onCollapseChange }: SidebarProps) => {
         aria-label="Main navigation"
       >
         {/* Logo section - Apple minimal style */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-slate-200">
+        <div className="flex items-center h-16 px-4">
           {!isCollapsed ? (
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shadow-sm">
-                <span className="text-white font-bold text-sm tracking-tight">I</span>
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-[8px] bg-[#0071e3] flex items-center justify-center">
+                <span className="text-white font-semibold text-[13px]">I</span>
               </div>
               <div className="flex flex-col">
-                <span className="font-semibold text-slate-900 tracking-tight">INNERTIA</span>
-                <span className="text-xs text-slate-500">Faculty Portal</span>
+                <span className="font-semibold text-[#1d1d1f] text-[15px] tracking[-0.02em]">INNERTIA</span>
+                <span className="text-[11px] text-[#86868b]">Faculty Portal</span>
               </div>
             </div>
           ) : (
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center mx-auto shadow-sm">
-              <span className="text-white font-bold text-sm tracking-tight">I</span>
+            <div className="w-7 h-7 rounded-[8px] bg-[#0071e3] flex items-center justify-center mx-auto">
+              <span className="text-white font-semibold text-[13px]">I</span>
             </div>
           )}
           
           {/* Notification bell for expanded state */}
           {!isCollapsed && (
             <button
-              className="relative p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+              className="relative p-1.5 rounded-[8px] hover:bg-[#f5f5f7] transition-colors ml-auto"
               aria-label="Notifications"
             >
-              <Bell size={18} className="text-slate-600" />
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+              <Bell size={18} className="text-[#86868b]" />
+              <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-[#ff3b30] rounded-full"></span>
             </button>
           )}
         </div>
 
         {/* Navigation with scrollable area */}
         <div className="flex-1 overflow-y-auto py-4 px-3">
-          <div className="space-y-6">
+          <div className="space-y-8">
             <NavSection
               title="Dashboard"
               items={dashboardItems}
               isCollapsed={isCollapsed}
             />
-            <div className="border-t border-slate-200 pt-6">
+            <div className="border-t border-[#d2d2d7] pt-8">
               <NavSection
                 title="System"
                 items={systemItems}
@@ -228,16 +228,16 @@ export const Sidebar = memo(({ className, onCollapseChange }: SidebarProps) => {
           </div>
         </div>
 
-        {/* Collapse Toggle - Apple style */}
-        <div className="p-3 border-t border-slate-200">
+        {/* Collapse Toggle - Apple minimal style */}
+        <div className="p-3 border-t border-[#d2d2d7]">
           <button
             onClick={toggleCollapse}
             className={twMerge(
               clsx(
-                'w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg',
-                'text-sm font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900',
-                'transition-all duration-200 ease-in-out',
-                'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1'
+                'w-full flex items-center justify-center gap-2 px-3 py-2 rounded-[10px]',
+                'text-[13px] font-normal text-[#1d1d1f] hover:bg-[#f5f5f7]',
+                'transition-all duration-200 ease-out',
+                'focus:outline-none focus:ring-2 focus:ring-[#0071e3] focus:ring-offset-1'
               )
             )}
             aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -254,10 +254,10 @@ export const Sidebar = memo(({ className, onCollapseChange }: SidebarProps) => {
         </div>
       </aside>
 
-      {/* Mobile menu button - Floating Apple-style */}
+      {/* Mobile menu button - Apple floating style */}
       <button
         onClick={toggleMobile}
-        className="lg:hidden fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-lg flex items-center justify-center hover:from-blue-700 hover:to-blue-800 transition-all duration-300 ease-in-out active:scale-95"
+        className="lg:hidden fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-[#0071e3] text-white shadow-[0_4px_12px_rgba(0,0,0,0.15)] flex items-center justify-center hover:bg-[#0077ed] transition-all duration-200 ease-out active:scale-95"
         aria-label={isMobileOpen ? 'Close menu' : 'Open menu'}
         aria-expanded={isMobileOpen}
       >

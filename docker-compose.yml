@@ -1,4 +1,3 @@
-version: '3.8'
 
 services:
   postgres:
@@ -72,10 +71,12 @@ services:
       - "3000:3000"
     depends_on:
       - backend
+    env_file:
+      - innertia-frontend/.env
     volumes:
       - ./innertia-frontend:/app
       - /app/node_modules
-    command: npm run dev -- --host
+    command: npm run dev -- --host --port 3000
     networks:
       - innertia_network
     stdin_open: true

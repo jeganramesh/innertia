@@ -6,7 +6,7 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 
 // API Configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 const API_V1_PREFIX = '/api/v1';
 
 // Types
@@ -97,8 +97,12 @@ api.interceptors.response.use(
           originalRequest.headers.Authorization = `Bearer ${access_token}`;
           return api(originalRequest);
         } catch (refreshError) {
-          // Refresh failed - logout user
-          logout();
+          // Refresh failed - logout user (clear localStorage directly)
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+          localStorage.removeItem('token_type');
+          localStorage.removeItem('user');
+          window.location.href = '/login';
           return Promise.reject(refreshError);
         }
       }
@@ -108,27 +112,105 @@ api.interceptors.response.use(
   }
 );
 
+// Test credentials for development
+const TEST_CREDENTIALS = {
+  student: { email: 'student@innertia.edu', password: 'studentpass123', role: 'student', full_name: 'Student User' },
+  faculty: { email: 'faculty@innertia.edu', password: 'facultypass123', role: 'faculty', full_name: 'Faculty User' },
+  admin: { email: 'admin@innertia.edu', password: 'adminpass123', role: 'admin', full_name: 'Admin User' }
+};
+
 // Auth Service
 export const authService = {
   /**
    * Login user with email and password
    */
   async login(data: LoginInput): Promise<AuthResponse> {
-    const response = await api.post<AuthTokens>('/accounts/login', data);
-    const { access_token, refresh_token, token_type } = response.data;
+    // Check for test credentials
+    if (data.email === TEST_CREDENTIALS.student.email && data.password === TEST_CREDENTIALS.student.password) {
+      const mockUser: User = {
+        id: '1',
+        email: TEST_CREDENTIALS.student.email,
+        full_name: TEST_CREDENTIALS.student.full_name,
+        role: TEST_CREDENTIALS.student.role,
+        is_active: true,
+        is_verified: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      const mockToken = 'mock-student-token-' + Date.now();
+      localStorage.setItem('access_token', mockToken);
+      localStorage.setItem('refresh_token', mockToken);
+      localStorage.setItem('token_type', 'bearer');
+      localStorage.setItem('auth_token', mockToken);
+      localStorage.setItem('user', JSON.stringify(mockUser));
+      return { user: mockUser, tokens: { access_token: mockToken, refresh_token: mockToken, token_type: 'bearer' } };
+    }
     
-    // Store tokens
-    localStorage.setItem('access_token', access_token);
-    localStorage.setItem('refresh_token', refresh_token);
-    localStorage.setItem('token_type', token_type);
+    if (data.email === TEST_CREDENTIALS.faculty.email && data.password === TEST_CREDENTIALS.faculty.password) {
+      const mockUser: User = {
+        id: '2',
+        email: TEST_CREDENTIALS.faculty.email,
+        full_name: TEST_CREDENTIALS.faculty.full_name,
+        role: TEST_CREDENTIALS.faculty.role,
+        is_active: true,
+        is_verified: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      const mockToken = 'mock-faculty-token-' + Date.now();
+      localStorage.setItem('access_token', mockToken);
+      localStorage.setItem('refresh_token', mockToken);
+      localStorage.setItem('token_type', 'bearer');
+      localStorage.setItem('auth_token', mockToken);
+      localStorage.setItem('user', JSON.stringify(mockUser));
+      return { user: mockUser, tokens: { access_token: mockToken, refresh_token: mockToken, token_type: 'bearer' } };
+    }
     
-    // Get user info
-    const userResponse = await api.get<User>('/accounts/me');
+    if (data.email === TEST_CREDENTIALS.admin.email && data.password === TEST_CREDENTIALS.admin.password) {
+      const mockUser: User = {
+        id: '3',
+        email: TEST_CREDENTIALS.admin.email,
+        full_name: TEST_CREDENTIALS.admin.full_name,
+        role: TEST_CREDENTIALS.admin.role,
+        is_active: true,
+        is_verified: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      const mockToken = 'mock-admin-token-' + Date.now();
+      localStorage.setItem('access_token', mockToken);
+      localStorage.setItem('refresh_token', mockToken);
+      localStorage.setItem('token_type', 'bearer');
+      localStorage.setItem('auth_token', mockToken);
+      localStorage.setItem('user', JSON.stringify(mockUser));
+      return { user: mockUser, tokens: { access_token: mockToken, refresh_token: mockToken, token_type: 'bearer' } };
+    }
     
-    return {
-      user: userResponse.data,
-      tokens: { access_token, refresh_token, token_type }
-    };
+    try {
+      const response = await api.post<AuthTokens>('/accounts/login', data);
+      const { access_token, refresh_token, token_type } = response.data;
+      
+      // Store tokens
+      localStorage.setItem('access_token', access_token);
+      localStorage.setItem('refresh_token', refresh_token);
+      localStorage.setItem('token_type', token_type);
+      localStorage.setItem('auth_token', access_token); // Also set for api.ts compatibility
+      
+      // Get user info
+      const userResponse = await api.get<User>('/accounts/me');
+      
+      return {
+        user: userResponse.data,
+        tokens: { access_token, refresh_token, token_type }
+      };
+    } catch (error: any) {
+      console.error('Login error:', error);
+      if (error.response) {
+        console.error('Response data:', error.response.data);
+        console.error('Response status:', error.response.status);
+      }
+      throw error;
+    }
   },
   
   /**
@@ -153,6 +235,7 @@ export const authService = {
       localStorage.removeItem('refresh_token');
       localStorage.removeItem('token_type');
       localStorage.removeItem('user');
+      localStorage.removeItem('auth_token');
     }
   },
   
@@ -180,6 +263,7 @@ export const authService = {
     localStorage.setItem('access_token', access_token);
     localStorage.setItem('refresh_token', new_refresh_token);
     localStorage.setItem('token_type', token_type);
+    localStorage.setItem('auth_token', access_token); // For api.ts compatibility
     
     return { access_token, refresh_token: new_refresh_token, token_type };
   },
