@@ -112,11 +112,11 @@ api.interceptors.response.use(
   }
 );
 
-// Test credentials for development
+// Test credentials matching backend (from create_test_users.py)
 const TEST_CREDENTIALS = {
-  student: { email: 'student@innertia.edu', password: 'studentpass123', role: 'student', full_name: 'Student User' },
-  faculty: { email: 'faculty@innertia.edu', password: 'facultypass123', role: 'faculty', full_name: 'Faculty User' },
-  admin: { email: 'admin@innertia.edu', password: 'adminpass123', role: 'admin', full_name: 'Admin User' }
+  student: { email: 'student@test.com', password: 'student123', role: 'student', full_name: 'Test Student' },
+  faculty: { email: 'faculty@test.com', password: 'faculty123', role: 'faculty', full_name: 'Test Faculty' },
+  admin: { email: 'admin@test.com', password: 'admin123', role: 'admin', full_name: 'Test Admin' }
 };
 
 // Auth Service

@@ -26,8 +26,8 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     
     # Database
-    DATABASE_URL: str = "postgresql+asyncpg://innertia:innertia123@localhost:5432/innertia_placement"
-    SYNC_DATABASE_URL: str = "postgresql://innertia:innertia123@localhost:5432/innertia_placement"
+    DATABASE_URL: str = "sqlite+aiosqlite:///./innertia.db"
+    SYNC_DATABASE_URL: str = "sqlite:///./innertia.db"
     
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"

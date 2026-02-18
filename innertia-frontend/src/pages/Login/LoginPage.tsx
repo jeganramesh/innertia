@@ -32,7 +32,7 @@ const LoginPage: React.FC = () => {
       <header className="py-8 px-6">
         <div className="max-w-md mx-auto">
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">
-            Innertia
+            Innertia Admin
           </h1>
         </div>
       </header>

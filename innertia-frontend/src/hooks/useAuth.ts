@@ -119,6 +119,7 @@ const getRoleBasedRoute = (role: string): string => {
     case 'faculty':
       return '/faculty';
     case 'student':
+      return '/student';
     default:
       return '/student';
   }

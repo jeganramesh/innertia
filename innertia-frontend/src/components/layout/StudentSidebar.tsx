@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback, memo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Home,
-  Upload,
+  BookOpen,
+  FileText,
+  Calendar,
   BarChart3,
   Settings,
   Menu,
@@ -10,7 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Bell,
-  Users,
+  User
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -28,7 +30,6 @@ interface NavSectionProps {
   isCollapsed: boolean;
 }
 
-// Memoized NavSection to prevent unnecessary re-renders
 const NavSection = memo(({ title, items, isCollapsed }: NavSectionProps) => {
   const location = useLocation();
 
@@ -73,7 +74,7 @@ const NavSection = memo(({ title, items, isCollapsed }: NavSectionProps) => {
                     <>
                       <span className="flex-1 truncate">{item.label}</span>
                       {item.badge && (
-                        <span className="flex-shrink-0 bg-[#0071e3] text-white text-[11px] font-medium px-2 py-0.5 rounded-full min-w-[1.5rem] text-center">
+                        <span className="flex-shrink-0 bg-green-500 text-white text-[11px] font-medium px-2 py-0.5 rounded-full min-w-[1.5rem] text-center">
                           {item.badge}
                         </span>
                       )}
@@ -91,35 +92,32 @@ const NavSection = memo(({ title, items, isCollapsed }: NavSectionProps) => {
 
 NavSection.displayName = 'NavSection';
 
-interface SidebarProps {
+interface StudentSidebarProps {
   className?: string;
   onCollapseChange?: (isCollapsed: boolean) => void;
 }
 
-export const Sidebar = memo(({ className, onCollapseChange }: SidebarProps) => {
+export const StudentSidebar = memo(({ className, onCollapseChange }: StudentSidebarProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
-  // Sync with localStorage for persistence
   useEffect(() => {
-    const saved = localStorage.getItem('sidebar-collapsed');
+    const saved = localStorage.getItem('student-sidebar-collapsed');
     if (saved) {
       setIsCollapsed(JSON.parse(saved));
     }
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('sidebar-collapsed', JSON.stringify(isCollapsed));
+    localStorage.setItem('student-sidebar-collapsed', JSON.stringify(isCollapsed));
     onCollapseChange?.(isCollapsed);
   }, [isCollapsed, onCollapseChange]);
 
-  // Close mobile sidebar on route change
   const location = useLocation();
   useEffect(() => {
     setIsMobileOpen(false);
   }, [location]);
 
-  // Close mobile sidebar on escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isMobileOpen) {
@@ -131,17 +129,18 @@ export const Sidebar = memo(({ className, onCollapseChange }: SidebarProps) => {
   }, [isMobileOpen]);
 
   const navItems: NavItem[] = [
-    { icon: <Home size={20} />, label: 'Dashboard', path: '/dashboard' },
-    { icon: <Users size={20} />, label: 'Faculty', path: '/faculty' },
-    { icon: <Users size={20} />, label: 'Students', path: '/students' },
-    { icon: <BarChart3 size={20} />, label: 'Classes', path: '/classes' },
-    { icon: <Upload size={20} />, label: 'Upload', path: '/upload' },
-    { icon: <BarChart3 size={20} />, label: 'Analytics', path: '/analytics' },
-    { icon: <Settings size={20} />, label: 'Settings', path: '/settings' },
+    { icon: <Home size={20} />, label: 'Dashboard', path: '/student' },
+    { icon: <BookOpen size={20} />, label: 'My Classes', path: '/student/classes' },
+    { icon: <Calendar size={20} />, label: 'Sessions', path: '/student/sessions' },
+    { icon: <FileText size={20} />, label: 'Notes', path: '/student/notes' },
+    { icon: <BarChart3 size={20} />, label: 'Attendance', path: '/student/attendance' },
+    { icon: <User size={20} />, label: 'Profile', path: '/student/profile' },
+    { icon: <Settings size={20} />, label: 'Settings', path: '/student/settings' },
   ];
 
-  const dashboardItems = navItems.slice(0, 5); // First 5 items
-  const systemItems = navItems.slice(5); // Last 2 items
+  const mainItems = navItems.slice(0, 4);
+  const personalItems = navItems.slice(4, 6);
+  const systemItems = navItems.slice(6);
 
   const toggleCollapse = useCallback(() => {
     setIsCollapsed((prev) => !prev);
@@ -153,7 +152,6 @@ export const Sidebar = memo(({ className, onCollapseChange }: SidebarProps) => {
 
   return (
     <>
-      {/* Mobile backdrop with smooth transition */}
       {isMobileOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden animate-fade-in"
@@ -162,7 +160,6 @@ export const Sidebar = memo(({ className, onCollapseChange }: SidebarProps) => {
         />
       )}
 
-      {/* Sidebar with Apple-inspired minimal design */}
       <aside
         className={twMerge(
           clsx(
@@ -170,50 +167,54 @@ export const Sidebar = memo(({ className, onCollapseChange }: SidebarProps) => {
             'flex flex-col',
             isCollapsed ? 'w-[72px]' : 'w-[272px]',
             isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
-            'select-none', // Apple-like non-selectable UI
+            'select-none',
             className
           )
         )}
-        aria-label="Main navigation"
+        aria-label="Student navigation"
       >
-        {/* Logo section - Apple minimal style */}
         <div className="flex items-center h-16 px-4">
           {!isCollapsed ? (
             <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-[8px] bg-[#0071e3] flex items-center justify-center">
-                <span className="text-white font-semibold text-[13px]">I</span>
+              <div className="w-7 h-7 rounded-[8px] bg-green-500 flex items-center justify-center">
+                <User size={16} className="text-white" />
               </div>
               <div className="flex flex-col">
                 <span className="font-semibold text-[#1d1d1f] text-[15px] tracking[-0.02em]">INNERTIA</span>
-                <span className="text-[11px] text-[#86868b]">Admin Portal</span>
+                <span className="text-[11px] text-green-600 font-medium">Student</span>
               </div>
             </div>
           ) : (
-            <div className="w-7 h-7 rounded-[8px] bg-[#0071e3] flex items-center justify-center mx-auto">
-              <span className="text-white font-semibold text-[13px]">I</span>
+            <div className="w-7 h-7 rounded-[8px] bg-green-500 flex items-center justify-center mx-auto">
+              <User size={16} className="text-white" />
             </div>
           )}
           
-          {/* Notification bell for expanded state */}
           {!isCollapsed && (
             <button
               className="relative p-1.5 rounded-[8px] hover:bg-[#f5f5f7] transition-colors ml-auto"
               aria-label="Notifications"
             >
               <Bell size={18} className="text-[#86868b]" />
-              <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-[#ff3b30] rounded-full"></span>
+              <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-green-500 rounded-full"></span>
             </button>
           )}
         </div>
 
-        {/* Navigation with scrollable area */}
         <div className="flex-1 overflow-y-auto py-4 px-3">
           <div className="space-y-8">
             <NavSection
-              title="Dashboard"
-              items={dashboardItems}
+              title="Main"
+              items={mainItems}
               isCollapsed={isCollapsed}
             />
+            <div className="border-t border-[#d2d2d7] pt-8">
+              <NavSection
+                title="Personal"
+                items={personalItems}
+                isCollapsed={isCollapsed}
+              />
+            </div>
             <div className="border-t border-[#d2d2d7] pt-8">
               <NavSection
                 title="System"
@@ -224,7 +225,6 @@ export const Sidebar = memo(({ className, onCollapseChange }: SidebarProps) => {
           </div>
         </div>
 
-        {/* Collapse Toggle - Apple minimal style */}
         <div className="p-3 border-t border-[#d2d2d7]">
           <button
             onClick={toggleCollapse}
@@ -233,7 +233,7 @@ export const Sidebar = memo(({ className, onCollapseChange }: SidebarProps) => {
                 'w-full flex items-center justify-center gap-2 px-3 py-2 rounded-[10px]',
                 'text-[13px] font-normal text-[#1d1d1f] hover:bg-[#f5f5f7]',
                 'transition-all duration-200 ease-out',
-                'focus:outline-none focus:ring-2 focus:ring-[#0071e3] focus:ring-offset-1'
+                'focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1'
               )
             )}
             aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -250,10 +250,9 @@ export const Sidebar = memo(({ className, onCollapseChange }: SidebarProps) => {
         </div>
       </aside>
 
-      {/* Mobile menu button - Apple floating style */}
       <button
         onClick={toggleMobile}
-        className="lg:hidden fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-[#0071e3] text-white shadow-[0_4px_12px_rgba(0,0,0,0.15)] flex items-center justify-center hover:bg-[#0077ed] transition-all duration-200 ease-out active:scale-95"
+        className="lg:hidden fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-green-500 text-white shadow-[0_4px_12px_rgba(0,0,0,0.15)] flex items-center justify-center hover:bg-green-600 transition-all duration-200 ease-out active:scale-95"
         aria-label={isMobileOpen ? 'Close menu' : 'Open menu'}
         aria-expanded={isMobileOpen}
       >
@@ -263,10 +262,8 @@ export const Sidebar = memo(({ className, onCollapseChange }: SidebarProps) => {
           <Menu size={24} className="animate-fade-in" />
         )}
       </button>
-
-
     </>
   );
 });
 
-Sidebar.displayName = 'Sidebar';
+StudentSidebar.displayName = 'StudentSidebar';

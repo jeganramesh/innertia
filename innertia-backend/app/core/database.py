@@ -1,6 +1,6 @@
 """
 Database connection and session management.
-Uses async SQLAlchemy for PostgreSQL.
+Uses async SQLAlchemy for SQLite.
 """
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
@@ -9,13 +9,10 @@ from typing import AsyncGenerator
 
 from app.core.config import settings
 
-# Create async engine
+# Create async engine (SQLite doesn't need pool settings)
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=settings.DEBUG,
-    pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
 )
 
 # Create async session factory
