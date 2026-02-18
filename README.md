@@ -1,243 +1,235 @@
-# Innertia Placement Shell
+# Innertia
 
-A production-ready authentication system for the Innertia Placement Shell platform, featuring JWT-based authentication, role-based access control, and a modern React frontend.
+A full-stack application designed as a comprehensive learning and management platform. It features distinct roles for administrators, faculty, and students, each with a tailored dashboard and functionalities.
 
-## 🚀 Quick Start
+## Technologies
+
+- **Backend:** Python, FastAPI, SQLAlchemy, Alembic, Celery, Redis
+- **Frontend:** React, TypeScript, Vite, Tailwind CSS
+- **Database:** SQLite
+- **Containerization:** Docker, Docker Compose
+
+## Project Structure
+
+```
+/home/jegan/Desktop/innertia/
+├───.dockerignore
+├───.env.example
+├───.gitignore
+├───docker-compose.yml
+├───README.md
+├───.git/
+├───innertia-backend/
+│   ├───.env.example
+│   ├───alembic.ini
+│   ├───Dockerfile
+│   ├───innertia.db
+│   ├───requirements.txt
+│   ├───__pycache__/
+│   ├───alembic/
+│   │   ├───env.py
+│   │   └───versions/
+│   │       └───001_initial_migration.py
+│   ├───app/
+│   │   ├───__init__.py
+│   │   ├───celery_worker.py
+│   │   ├───main.py
+│   │   ├───accounts/
+│   │   │   ├───__init__.py
+│   │   │   ├───dependencies.py
+│   │   │   ├───models.py
+│   │   │   ├───routes.py
+│   │   │   ├───schemas.py
+│   │   │   └───utils.py
+│   │   ├───admin/
+│   │   │   ├───__init__.py
+│   │   │   ├───router.py
+│   │   │   └───schemas.py
+│   │   ├───core/
+│   │   │   ├───__init__.py
+│   │   │   ├───config.py
+│   │   │   ├───database.py
+│   │   │   ├───redis.py
+│   │   │   └───security.py
+│   │   ├───faculty/
+│   │   │   ├───__init__.py
+│   │   │   ├───router.py
+│   │   │   └───schemas.py
+│   │   ├───models/
+│   │   │   ├───__init__.py
+│   │   │   └───models.py
+│   │   ├───scripts/
+│   │   │   ├───__init__.py
+│   │   │   └───create_test_users.py
+│   │   └───student/
+│   │       ├───__init__.py
+│   │       ├───router.py
+│   │       └───schemas.py
+│   ├───data/
+│   └───tests/
+│       ├───__init__.py
+│       ├───conftest.py
+│       └───test_accounts.py
+└───innertia-frontend/
+    ├───.env.example
+    ├───.gitignore
+    ├───.kilocodemodes
+    ├───Dockerfile
+    ├───eslint.config.js
+    ├───index.html
+    ├───nginx.conf
+    ├───package-lock.json
+    ├───package.json
+    ├───postcss.config.js
+    ├───README.md
+    ├───tailwind.config.js
+    ├───tsconfig.json
+    ├───tsconfig.node.json
+    ├───vite.config.js
+    ├───node_modules/
+    ├───public/
+    │   └───vite.svg
+    └───src/
+        ├───App.css
+        ├───App.jsx
+        ├───App.tsx
+        ├───index.css
+        ├───main.jsx
+        ├───vite-env.d.ts
+        ├───assets/
+        │   └───react.svg
+        ├───components/
+        │   ├───faculty/
+        │   │   ├───ClassTable.tsx
+        │   │   ├───CreateClassForm.tsx
+        │   │   ├───RecentSessions.tsx
+        │   │   └───UploadZone.tsx
+        │   ├───layout/
+        │   │   ├───AdminSidebar.tsx
+        │   │   ├───FacultySidebar.tsx
+        │   │   ├───Header.tsx
+        │   │   ├───MainLayout.tsx
+        │   │   ├───RoleBasedLayout.tsx
+        │   │   ├───Sidebar.tsx
+        │   │   └───StudentSidebar.tsx
+        │   ├───ui/
+        │   │   ├───Badge.tsx
+        │   │   ├───Button.tsx
+        │   │   ├───Card.tsx
+        │   │   ├───Dialog.tsx
+        │   │   ├───ErrorState.tsx
+        │   │   ├───Input.tsx
+        │   │   ├───PageSkeleton.tsx
+        │   │   ├───ProgressBar.tsx
+        │   │   ├───Skeleton.tsx
+        │   │   ├───StatusBadge.tsx
+        │   │   ├───Table.tsx
+        │   │   └───Toast.tsx
+        │   └───upload/
+        │       └───FileList.tsx
+        ├───hooks/
+        │   ├───useAuth.ts
+        │   └───useFacultyData.ts
+        ├───pages/
+        │   ├───AnalyticsPage.tsx
+        │   ├───ClassesPage.tsx
+        │   ├───SettingsPage.tsx
+        │   ├───UploadPage.tsx
+        │   ├───admin/
+        │   │   ├───AdminAnalyticsPage.tsx
+        │   │   ├───AdminDashboard.tsx
+        │   │   ├───AdminSettingsPage.tsx
+        │   │   ├───ClassesPage.tsx
+        │   │   ├───index.ts
+        │   │   ├───SessionsPage.tsx
+        │   │   ├───types.ts
+        │   │   └───UsersPage.tsx
+        │   ├───faculty/
+        │   │   ├───FacultyClassesPage.tsx
+        │   │   ├───FacultyDashboard.tsx
+        │   │   ├───FacultySessionPage.tsx
+        │   │   ├───index.ts
+        │   │   └───types.ts
+        │   ├───Login/
+        │   │   ├───index.ts
+        │   │   ├───LoginForm.tsx
+        │   │   └───LoginPage.tsx
+        │   └───student/
+        │       ├───index.ts
+        │       ├───StudentDashboard.tsx
+        │       ├───StudentNotesPage.tsx
+        │       ├───StudentSessionPage.tsx
+        │       └───types.ts
+        ├───services/
+        │   ├───api.ts
+        │   ├───auth.ts
+        │   ├───mockData.ts
+        │   └───websocketService.ts
+        ├───stores/
+        │   ├───facultyStore.ts
+        │   └───uploadStore.ts
+        ├───types/
+        │   └───index.ts
+        └───utils/
+            └───formatters.ts
+```
+
+## Getting Started
+
+To get a local copy up and running, follow these simple steps.
 
 ### Prerequisites
 
-- Docker & Docker Compose
 - Git
+- Python 3.8+
+- Node.js & npm
+- Docker (optional)
 
-### Installation
+### Backend Setup
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd innertia
-   ```
+1.  Navigate to the backend directory:
+    ```sh
+    cd innertia-backend
+    ```
+2.  Create and activate a virtual environment:
+    ```sh
+    python -m venv venv
+    source venv/bin/activate
+    ```
+3.  Install the required packages:
+    ```sh
+    pip install -r requirements.txt
+    ```
+4.  Set up your environment variables by copying the example file:
+    ```sh
+    cp .env.example .env
+    ```
+    *Update `.env` with your configuration (e.g., database URL, secret keys).*
+5.  Run database migrations:
+    ```sh
+    alembic upgrade head
+    ```
+6.  Start the development server:
+    ```sh
+    uvicorn app.main:app --reload
+    ```
 
-2. **Start all services**
-   ```bash
-   docker-compose up -d
-   ```
+### Frontend Setup
 
-3. **Access the application**
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:8000
-   - API Documentation: http://localhost:8000/api/docs
-
-### Demo Credentials
-
-| Role | Email | Password |
-|------|-------|----------|
-| Student | student@innertia.edu | studentpass123 |
-| Faculty | faculty@innertia.edu | facultypass123 |
-| Admin | admin@innertia.edu | adminpass123 |
-
-> **Note**: You'll need to register users first via the API or create them manually.
-
----
-
-## 🏗️ Architecture
-
-### Backend (FastAPI)
-
-```
-innertia-backend/
-├── app/
-│   ├── accounts/           # Authentication module
-│   │   ├── models.py       # SQLAlchemy models (User, RefreshToken)
-│   │   ├── schemas.py      # Pydantic schemas
-│   │   ├── utils.py        # Password hashing, JWT tokens
-│   │   ├── dependencies.py # Auth dependencies
-│   │   └── routes.py       # API endpoints
-│   ├── core/
-│   │   ├── config.py       # Application settings
-│   │   ├── database.py     # Database connection
-│   │   ├── redis.py       # Redis client
-│   │   └── security.py    # CORS, rate limiting
-│   ├── celery_worker.py    # Celery configuration
-│   └── main.py            # FastAPI application
-├── alembic/                # Database migrations
-├── tests/                  # Unit & integration tests
-├── Dockerfile
-└── requirements.txt
-```
-
-### Frontend (React 19 + TypeScript)
-
-```
-innertia-frontend/
-├── src/
-│   ├── pages/Login/        # Login page components
-│   ├── services/auth.ts    # Authentication API service
-│   ├── hooks/useAuth.ts    # Authentication hook
-│   └── App.tsx            # Main application
-├── Dockerfile
-└── package.json
-```
-
----
-
-## 🔐 Authentication API
-
-### Endpoints
-
-All endpoints are prefixed with `/api/v1/accounts`.
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/register` | Register new user |
-| POST | `/login` | Authenticate and get tokens |
-| POST | `/refresh` | Refresh access token |
-| POST | `/logout` | Logout (blacklist tokens) |
-| GET | `/me` | Get current user info |
-
-### Example Usage
-
-#### Register User
-```bash
-curl -X POST "http://localhost:8000/api/v1/accounts/register" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "student@innertia.edu",
-    "password": "securepassword123",
-    "full_name": "John Doe",
-    "role": "student"
-  }'
-```
-
-#### Login
-```bash
-curl -X POST "http://localhost:8000/api/v1/accounts/login" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "student@innertia.edu",
-    "password": "securepassword123"
-  }'
-```
-
-Response:
-```json
-{
-  "access_token": "eyJhbGciOiJIUzI1NiIs...",
-  "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
-  "token_type": "bearer"
-}
-```
-
-#### Access Protected Endpoint
-```bash
-curl -X GET "http://localhost:8000/api/v1/accounts/me" \
-  -H "Authorization: Bearer <access_token>"
-```
-
----
-
-## 🔧 Configuration
-
-### Environment Variables
-
-Create a `.env` file in the root directory:
-
-```env
-# Backend
-SECRET_KEY=your-secret-key-change-in-production
-DATABASE_URL=postgresql+asyncpg://innertia:innertia123@postgres:5432/innertia_placement
-REDIS_URL=redis://redis:6379/0
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-REFRESH_TOKEN_EXPIRE_DAYS=7
-
-# Frontend
-VITE_API_URL=http://localhost:8000
-```
-
----
-
-## 🧪 Testing
-
-### Backend Tests
-
-```bash
-cd innertia-backend
-
-# Run tests
-pytest tests/ -v --cov
-
-# Run with coverage report
-pytest tests/ --cov=app --cov-report=html
-```
-
-### Frontend Tests
-
-```bash
-cd innertia-frontend
-
-# Run tests
-npm test
-
-# Run with coverage
-npm test -- --coverage
-```
-
----
-
-## 🐳 Docker Services
-
-| Service | Port | Description |
-|---------|------|-------------|
-| postgres | 5432 | PostgreSQL database |
-| redis | 6379 | Redis cache & broker |
-| backend | 8000 | FastAPI application |
-| frontend | 3000 | React application |
-| celery_worker | - | Background task worker |
-
----
-
-## 📁 Project Structure
-
-```
-innertia/
-├── docker-compose.yml
-├── README.md
-├── .env.example
-├── innertia-backend/
-│   ├── app/
-│   ├── alembic/
-│   ├── tests/
-│   ├── Dockerfile
-│   └── requirements.txt
-└── innertia-frontend/
-    ├── src/
-    ├── Dockerfile
-    └── package.json
-```
-
----
-
-## 🔒 Security Features
-
-- **JWT Authentication**: Access + Refresh tokens
-- **Password Hashing**: bcrypt with salt
-- **Token Blacklisting**: Redis-based logout
-- **Rate Limiting**: Configurable requests per minute
-- **CORS**: Configured for frontend origins
-- **Input Validation**: Pydantic schemas
-- **Security Headers**: XSS, CSRF protection
-
----
-
-## 📝 License
-
-MIT License
-
----
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+1.  Navigate to the frontend directory:
+    ```sh
+    cd innertia-frontend
+    ```
+2.  Install NPM packages:
+    ```sh
+    npm install
+    ```
+3.  Set up your environment variables by copying the example file:
+    ```sh
+    cp .env.example .env
+    ```
+    *Update `.env` with your API endpoint.*
+4.  Start the development server:
+    ```sh
+    npm run dev
+    ```
