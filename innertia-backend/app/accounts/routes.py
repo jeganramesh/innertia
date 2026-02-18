@@ -13,7 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.database import get_db
 from app.core.redis import redis_client
 from app.core.config import settings
-from app.accounts.models import User, RefreshToken
+from app.models.models import User, RefreshToken
 from app.accounts.schemas import (
     UserCreate, UserLogin, UserOut, Token,
     TokenRefresh, MessageResponse, ErrorResponse
@@ -48,7 +48,7 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
     
     - **email**: Valid email address (unique)
     - **password**: At least 8 characters
-    - **full_name**: Optional full name
+    - **name**: Optional name
     - **role**: Optional role (student/faculty/admin) - defaults to student
     """
     # Check if user already exists
@@ -75,7 +75,7 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
     new_user = User(
         email=user_data.email,
         password_hash=hashed_password,
-        full_name=user_data.full_name,
+        name=user_data.name,
         role=role
     )
     

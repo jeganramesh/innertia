@@ -12,6 +12,9 @@ from app.core.database import init_db, close_db
 from app.core.redis import redis_client
 from app.core.security import setup_cors, setup_rate_limiting, setup_security_headers
 from app.accounts.routes import router as accounts_router
+from app.admin.router import router as admin_router
+from app.faculty.router import router as faculty_router
+from app.student.router import router as student_router
 
 
 @asynccontextmanager
@@ -78,6 +81,9 @@ setup_rate_limiting(app)
 
 # Include routers
 app.include_router(accounts_router, prefix=settings.API_V1_PREFIX)
+app.include_router(admin_router, prefix=settings.API_V1_PREFIX)
+app.include_router(faculty_router, prefix=settings.API_V1_PREFIX)
+app.include_router(student_router, prefix=settings.API_V1_PREFIX)
 
 
 # Health check endpoint

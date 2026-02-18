@@ -89,7 +89,7 @@ def sample_user_data():
     return {
         "email": "test@example.com",
         "password": "testpassword123",
-        "full_name": "Test User",
+        "name": "Test User",
         "role": "student"
     }
 
@@ -100,7 +100,7 @@ def sample_admin_data():
     return {
         "email": "admin@example.com",
         "password": "adminpassword123",
-        "full_name": "Admin User",
+        "name": "Admin User",
         "role": "admin"
     }
 

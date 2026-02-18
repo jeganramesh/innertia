@@ -11,7 +11,7 @@ from alembic import context
 
 from app.core.config import settings
 from app.core.database import Base
-from app.accounts.models import User, RefreshToken
+from app.models.models import User, RefreshToken
 
 
 # this is the Alembic Config object, which provides
@@ -58,9 +58,13 @@ async def run_async_migrations() -> None:
 
 def do_run_migrations(connection: Connection) -> None:
     """Execute migrations."""
+    # Check if we're using SQLite for batch mode support
+    dialect_name = connection.dialect.name
+    
     context.configure(
         connection=connection,
-        target_metadata=target_metadata
+        target_metadata=target_metadata,
+        render_as_batch=dialect_name == 'sqlite'
     )
 
     with context.begin_transaction():

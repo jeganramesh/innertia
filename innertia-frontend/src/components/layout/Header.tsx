@@ -4,6 +4,7 @@ import { Avatar } from '../ui/Badge';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import type { BreadcrumbItem } from '../types';
+import { useAuth } from '../../hooks/useAuth';
 
 interface HeaderProps {
   className?: string;
@@ -22,6 +23,7 @@ export const Header = ({
   showSearch = false,
   onSearch,
 }: HeaderProps) => {
+  const { user, logout } = useAuth();
   return (
     <header
       className={twMerge(
@@ -88,11 +90,11 @@ export const Header = ({
         {/* User Menu */}
         <div className="flex items-center gap-3 pl-3 border-l border-slate-200">
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-medium text-slate-900">Dr. Sarah Johnson</p>
-            <p className="text-xs text-slate-500">Faculty</p>
+            <p className="text-sm font-medium text-slate-900">{user?.full_name || user?.email || 'User'}</p>
+            <p className="text-xs text-slate-500 capitalize">{user?.role || 'User'}</p>
           </div>
-          <Avatar initials="SJ" size="md" />
-          <Button variant="ghost" size="sm" className="hidden sm:flex">
+          <Avatar initials={user?.full_name ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U'} size="md" />
+          <Button variant="ghost" size="sm" className="hidden sm:flex" onClick={logout} title="Logout">
             <LogOut size={18} />
           </Button>
         </div>

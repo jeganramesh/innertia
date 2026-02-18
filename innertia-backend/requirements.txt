@@ -37,3 +37,7 @@ aiosqlite==0.19.0
 
 # Environment
 python-dotenv==1.0.1
+
+# File handling for bulk uploads
+pandas==2.2.0
+openpyxl==3.1.5

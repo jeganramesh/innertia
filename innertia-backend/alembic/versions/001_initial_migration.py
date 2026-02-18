@@ -26,7 +26,7 @@ def upgrade() -> None:
         sa.Column('id', sa.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
         sa.Column('email', sa.String(255), nullable=False),
         sa.Column('password_hash', sa.String(255), nullable=False),
-        sa.Column('full_name', sa.String(255), nullable=True),
+        sa.Column('name', sa.String(255), nullable=True),
         sa.Column('role', sa.String(50), nullable=False, default='student'),
         sa.Column('is_active', sa.Boolean, default=True),
         sa.Column('is_verified', sa.Boolean, default=False),

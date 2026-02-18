@@ -13,7 +13,7 @@ from sqlalchemy import select
 
 from app.core.database import get_db
 from app.core.redis import redis_client
-from app.accounts.models import User
+from app.models.models import User
 from app.accounts.utils import decode_token, create_access_token
 from app.accounts.schemas import TokenPayload
 from app.core.config import settings
@@ -180,7 +180,7 @@ def create_user_response(user: User) -> dict:
     return {
         "id": str(user.id),
         "email": user.email,
-        "full_name": user.full_name,
+        "name": user.name,
         "role": user.role,
         "is_active": user.is_active,
         "is_verified": user.is_verified,

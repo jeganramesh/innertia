@@ -13,7 +13,7 @@ from pydantic import BaseModel, EmailStr, Field, ConfigDict
 class UserBase(BaseModel):
     """Base user schema with common fields."""
     email: EmailStr
-    full_name: Optional[str] = None
+    name: Optional[str] = None
 
 
 class UserCreate(UserBase):
@@ -25,7 +25,7 @@ class UserCreate(UserBase):
         "example": {
             "email": "student@innertia.edu",
             "password": "securepassword123",
-            "full_name": "John Doe",
+            "name": "John Doe",
             "role": "student"
         }
     })
@@ -46,13 +46,14 @@ class UserLogin(BaseModel):
 
 class UserUpdate(BaseModel):
     """Schema for updating user information."""
-    full_name: Optional[str] = None
+    name: Optional[str] = None
     is_active: Optional[bool] = None
 
 
 class UserOut(UserBase):
     """Schema for user response."""
     id: str
+    name: str
     role: str
     is_active: bool
     is_verified: bool

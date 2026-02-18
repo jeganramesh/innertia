@@ -18,7 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal, engine, Base
-from app.accounts.models import User
+from app.models.models import User
 from app.accounts.utils import hash_password
 
 
@@ -27,7 +27,7 @@ TEST_USERS = [
     {
         "email": "student@test.com",
         "password": "student123",
-        "full_name": "Test Student",
+        "name": "Test Student",
         "role": "student",
         "is_active": True,
         "is_verified": True,
@@ -35,7 +35,7 @@ TEST_USERS = [
     {
         "email": "faculty@test.com",
         "password": "faculty123",
-        "full_name": "Test Faculty",
+        "name": "Test Faculty",
         "role": "faculty",
         "is_active": True,
         "is_verified": True,
@@ -43,7 +43,7 @@ TEST_USERS = [
     {
         "email": "admin@test.com",
         "password": "admin123",
-        "full_name": "Test Admin",
+        "name": "Test Admin",
         "role": "admin",
         "is_active": True,
         "is_verified": True,
@@ -75,7 +75,7 @@ async def create_test_users() -> None:
             user = User(
                 email=user_data["email"],
                 password_hash=hash_password(user_data["password"]),
-                full_name=user_data["full_name"],
+                name=user_data["name"],
                 role=user_data["role"],
                 is_active=user_data["is_active"],
                 is_verified=user_data["is_verified"],
@@ -87,7 +87,7 @@ async def create_test_users() -> None:
             print(f"\n[CREATED] {user_data['role'].upper()} User:")
             print(f"          Email: {user.email}")
             print(f"          Password: {user_data['password']}")
-            print(f"          Name: {user.full_name}")
+            print(f"          Name: {user.name}")
             print(f"          ID: {user.id}")
         
         await session.commit()

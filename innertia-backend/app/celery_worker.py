@@ -74,16 +74,16 @@ def send_password_reset_email(self, user_id: str, email: str, token: str):
 
 
 @celery_app.task(bind=True)
-def send_welcome_email(self, user_id: str, email: str, full_name: str):
+def send_welcome_email(self, user_id: str, email: str, name: str):
     """
     Send welcome email to new user.
     
     Args:
         user_id: User's UUID
         email: User's email address
-        full_name: User's full name
+        name: User's name
     """
     print(f"Sending welcome email to {email}")
-    print(f"Welcome {full_name}!")
+    print(f"Welcome {name}!")
     
     return True

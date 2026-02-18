@@ -9,6 +9,20 @@ from typing import AsyncGenerator
 
 from app.core.config import settings
 
+# Base class for models - must be declared before importing models
+Base = declarative_base()
+
+# Import all models to register them with SQLAlchemy (after Base is defined)
+from app.models.models import (
+    User,
+    RefreshToken,
+    Class,
+    Session as SessionModel,
+    Enrollment,
+    SlideState,
+    Note
+)
+
 # Create async engine (SQLite doesn't need pool settings)
 engine = create_async_engine(
     settings.DATABASE_URL,
@@ -23,9 +37,6 @@ AsyncSessionLocal = async_sessionmaker(
     autocommit=False,
     autoflush=False,
 )
-
-# Base class for models
-Base = declarative_base()
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

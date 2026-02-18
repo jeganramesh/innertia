@@ -23,7 +23,7 @@ async def test_register_user(client: AsyncClient, sample_user_data: dict):
     assert response.status_code == 201
     data = response.json()
     assert data["email"] == sample_user_data["email"]
-    assert data["full_name"] == sample_user_data["full_name"]
+    assert data["name"] == sample_user_data["name"]
     assert data["role"] == sample_user_data["role"]
     assert "id" in data
     assert "password_hash" not in data

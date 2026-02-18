@@ -1,6 +1,6 @@
 """Accounts module for authentication."""
 
-from app.accounts.models import User, RefreshToken
+from app.models.models import User, RefreshToken
 from app.accounts.schemas import (
     UserCreate, UserLogin, UserOut, UserUpdate,
     Token, TokenRefresh, TokenPayload,
