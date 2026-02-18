@@ -38,6 +38,10 @@ A production-ready authentication system for the Innertia Placement Shell platfo
 | Faculty | faculty@innertia.edu | facultypass123 |
 | Admin | admin@innertia.edu | adminpass123 |
 
+Admin: admin@test.com / admin123
+Faculty: faculty@test.com / faculty123
+Student: student@test.com / student123
+
 > **Note**: You'll need to register users first via the API or create them manually.
 
 ---
