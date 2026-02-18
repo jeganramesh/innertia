@@ -5,6 +5,7 @@ export { AdminClassesPage } from './ClassesPage';
 export { AdminSessionsPage } from './SessionsPage';
 export { AdminAnalyticsPage } from './AdminAnalyticsPage';
 export { AdminSettingsPage } from './AdminSettingsPage';
+export { UserBulkUpload } from './UserBulkUpload';
 export type { 
   AdminStats, 
   SystemConfig, 

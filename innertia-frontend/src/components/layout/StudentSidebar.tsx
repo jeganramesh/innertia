@@ -129,7 +129,7 @@ export const StudentSidebar = memo(({ className, onCollapseChange }: StudentSide
   }, [isMobileOpen]);
 
   const navItems: NavItem[] = [
-    { icon: <Home size={20} />, label: 'Dashboard', path: '/student' },
+    { icon: <Home size={20} />, label: 'Dashboard', path: '/student/dashboard' },
     { icon: <BookOpen size={20} />, label: 'My Classes', path: '/student/classes' },
     { icon: <Calendar size={20} />, label: 'Sessions', path: '/student/sessions' },
     { icon: <FileText size={20} />, label: 'Notes', path: '/student/notes' },

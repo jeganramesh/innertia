@@ -2,6 +2,7 @@
 export { FacultyDashboard } from './FacultyDashboard';
 export { FacultyClassesPage } from './FacultyClassesPage';
 export { FacultySessionPage } from './FacultySessionPage';
+export { StudentBulkUpload } from './StudentBulkUpload';
 export type { 
   FacultyClass, 
   FacultySession, 

@@ -1,11 +1,12 @@
 /**
  * useAuth Hook
  * Manages authentication state and provides login/logout functionality
+ * Uses the centralized authService
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import authService, { User, LoginInput, AuthResponse } from '../services/auth';
+import authService, { User, LoginInput, AuthResponse } from '../services/authService';
 
 interface UseAuthReturn {
   user: User | null;
@@ -61,13 +62,13 @@ export const useAuth = (): UseAuthReturn => {
     setError(null);
     
     try {
-      const response = await authService.login(credentials);
+      const response: AuthResponse = await authService.login(credentials);
       console.log('Login response:', response);
       setUser(response.user);
       authService.storeUser(response.user);
       
       // Redirect to role-based dashboard
-      const redirectTo = getRoleBasedRoute(response.user.role);
+      const redirectTo = authService.getRoleBasedRoute(response.user.role);
       console.log('Redirecting to:', redirectTo);
       const from = location.state?.from?.pathname || redirectTo;
       navigate(from, { replace: true });
@@ -109,20 +110,6 @@ export const useAuth = (): UseAuthReturn => {
     logout,
     clearError,
   };
-};
-
-// Helper function to get role-based redirect route
-const getRoleBasedRoute = (role: string): string => {
-  switch (role) {
-    case 'admin':
-      return '/admin';
-    case 'faculty':
-      return '/faculty';
-    case 'student':
-      return '/student';
-    default:
-      return '/student';
-  }
 };
 
 export default useAuth;

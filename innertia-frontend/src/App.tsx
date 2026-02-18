@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ToastProviderWithManager } from './components/ui/Toast';
 import { LoginPage } from './pages/Login';
+import { ForbiddenPage } from './pages/Forbidden';
 import { useAuth } from './hooks/useAuth';
 import { AdminLayout, FacultyLayout, StudentLayout } from './components/layout/RoleBasedLayout';
 
@@ -11,14 +12,16 @@ import {
   AdminClassesPage, 
   AdminSessionsPage, 
   AdminAnalyticsPage, 
-  AdminSettingsPage 
+  AdminSettingsPage,
+  UserBulkUpload
 } from './pages/admin';
 
 // Faculty Pages
 import { 
   FacultyDashboard, 
   FacultyClassesPage, 
-  FacultySessionPage 
+  FacultySessionPage,
+  StudentBulkUpload as FacultyStudentBulkUpload
 } from './pages/faculty';
 
 // Student Pages
@@ -59,11 +62,11 @@ const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
       // Redirect to their proper dashboard based on role
       switch (userRole) {
         case 'admin':
-          return <Navigate to="/admin" replace />;
+          return <Navigate to="/admin/dashboard" replace />;
         case 'faculty':
-          return <Navigate to="/faculty" replace />;
+          return <Navigate to="/faculty/dashboard" replace />;
         case 'student':
-          return <Navigate to="/student" replace />;
+          return <Navigate to="/student/dashboard" replace />;
         default:
           return <Navigate to="/login" replace />;
       }
@@ -80,9 +83,10 @@ const AdminRoutes = () => {
   return (
     <AdminLayout>
       <Routes>
-        <Route index element={<Navigate to="/admin" replace />} />
-        <Route path="/" element={<AdminDashboard />} />
+        <Route index element={<Navigate to="/admin/dashboard" replace />} />
+        <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="users" element={<UsersPage />} />
+        <Route path="upload" element={<UserBulkUpload />} />
         <Route path="classes" element={<AdminClassesPage />} />
         <Route path="sessions" element={<AdminSessionsPage />} />
         <Route path="analytics" element={<AdminAnalyticsPage />} />
@@ -97,10 +101,11 @@ const FacultyRoutes = () => {
   return (
     <FacultyLayout>
       <Routes>
-        <Route index element={<Navigate to="/faculty" replace />} />
-        <Route path="/" element={<FacultyDashboard />} />
+        <Route index element={<Navigate to="/faculty/dashboard" replace />} />
+        <Route path="dashboard" element={<FacultyDashboard />} />
         <Route path="classes" element={<FacultyClassesPage />} />
         <Route path="session" element={<FacultySessionPage />} />
+        <Route path="upload" element={<FacultyStudentBulkUpload />} />
       </Routes>
     </FacultyLayout>
   );
@@ -111,8 +116,8 @@ const StudentRoutes = () => {
   return (
     <StudentLayout>
       <Routes>
-        <Route index element={<Navigate to="/student" replace />} />
-        <Route path="/" element={<StudentDashboard />} />
+        <Route index element={<Navigate to="/student/dashboard" replace />} />
+        <Route path="dashboard" element={<StudentDashboard />} />
         <Route path="session" element={<StudentSessionPage />} />
         <Route path="notes" element={<StudentNotesPage />} />
       </Routes>
@@ -127,6 +132,7 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/forbidden" element={<ForbiddenPage />} />
           
           {/* Admin Routes - Full System Control */}
           <Route 
@@ -161,7 +167,7 @@ function App() {
           {/* Legacy route redirect */}
           <Route 
             path="/dashboard" 
-            element={<Navigate to="/admin" replace />} 
+            element={<Navigate to="/admin/dashboard" replace />} 
           />
           
           {/* Redirect root to login if not authenticated, otherwise to role-based dashboard */}
