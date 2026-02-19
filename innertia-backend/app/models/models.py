@@ -160,3 +160,25 @@ class Note(Base):
     
     def __repr__(self) -> str:
         return f"<Note(id={self.id}, user_id={self.user_id}, class_id={self.class_id})>"
+
+
+class AINote(Base):
+    """AI-generated immersive notes for a class."""
+    
+    __tablename__ = "ai_notes"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    class_id = Column(UUID(as_uuid=True), ForeignKey("classes.id"), nullable=False, index=True)
+    lesson_title = Column(String(500), nullable=False)
+    raw_text = Column(Text, nullable=False)
+    structured_content = Column(Text, nullable=False)  # JSON string
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    class_obj = relationship("Class")
+    creator = relationship("User")
+    
+    def __repr__(self) -> str:
+        return f"<AINote(id={self.id}, class_id={self.class_id}, lesson_title={self.lesson_title})>"

@@ -14,7 +14,8 @@ import {
   ChevronRight,
   Bell,
   GraduationCap,
-  Upload
+  Upload,
+  Sparkles
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -135,6 +136,7 @@ export const FacultySidebar = memo(({ className, onCollapseChange }: FacultySide
     { icon: <BookOpen size={20} />, label: 'My Classes', path: '/faculty/classes' },
     { icon: <Play size={20} />, label: 'Sessions', path: '/faculty/session' },
     { icon: <Upload size={20} />, label: 'Student Upload', path: '/faculty/upload' },
+    { icon: <Sparkles size={20} />, label: 'AI Notes', path: '/faculty/ai-notes' },
     { icon: <BarChart3 size={20} />, label: 'Analytics', path: '/faculty/analytics' },
     { icon: <Users size={20} />, label: 'Students', path: '/faculty/students' },
     { icon: <FileText size={20} />, label: 'Notes', path: '/faculty/notes' },

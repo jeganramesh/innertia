@@ -15,7 +15,7 @@ import type {
 import { mockClasses, mockSessions, mockStats, mockUploadFiles, mockSessionReport } from './mockData';
 
 // API base URL - can be configured via environment variable
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
 
 // Helper to simulate network delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));

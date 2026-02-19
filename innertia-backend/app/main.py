@@ -15,6 +15,7 @@ from app.accounts.routes import router as accounts_router
 from app.admin.router import router as admin_router
 from app.faculty.router import router as faculty_router
 from app.student.router import router as student_router
+from app.ai_notes.router import router as ai_notes_router
 
 
 @asynccontextmanager
@@ -84,6 +85,7 @@ app.include_router(accounts_router, prefix=settings.API_V1_PREFIX)
 app.include_router(admin_router, prefix=settings.API_V1_PREFIX)
 app.include_router(faculty_router, prefix=settings.API_V1_PREFIX)
 app.include_router(student_router, prefix=settings.API_V1_PREFIX)
+app.include_router(ai_notes_router, prefix=settings.API_V1_PREFIX)
 
 
 # Health check endpoint

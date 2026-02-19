@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE: int = 100
     
+    # AI Services
+    GEMINI_API_KEY: str | None = None
+    UNSPLASH_ACCESS_KEY: str | None = None
+    
     @field_validator('CORS_ORIGINS', mode='before')
     @classmethod
     def parse_cors_origins(cls, v):
@@ -59,6 +63,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "forbid"
 
 
 @lru_cache()

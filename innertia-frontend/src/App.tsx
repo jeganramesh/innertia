@@ -21,7 +21,8 @@ import {
   FacultyDashboard, 
   FacultyClassesPage, 
   FacultySessionPage,
-  StudentBulkUpload as FacultyStudentBulkUpload
+  StudentBulkUpload as FacultyStudentBulkUpload,
+  AINotesPage
 } from './pages/faculty';
 
 // Student Pages
@@ -106,6 +107,7 @@ const FacultyRoutes = () => {
         <Route path="classes" element={<FacultyClassesPage />} />
         <Route path="session" element={<FacultySessionPage />} />
         <Route path="upload" element={<FacultyStudentBulkUpload />} />
+        <Route path="ai-notes" element={<AINotesPage />} />
       </Routes>
     </FacultyLayout>
   );
