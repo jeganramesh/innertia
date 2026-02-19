@@ -1,4 +1,4 @@
-import { Bell, Search, User, LogOut } from 'lucide-react';
+import { Bell, Search, LogOut } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Avatar } from '../ui/Badge';
 import { clsx, type ClassValue } from 'clsx';
@@ -28,7 +28,7 @@ export const Header = ({
     <header
       className={twMerge(
         clsx(
-          'sticky top-0 z-30 bg-white border-b border-slate-200',
+          'sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-gray-200',
           'h-16 flex items-center justify-between px-6',
           className
         )
@@ -41,24 +41,24 @@ export const Header = ({
             {breadcrumbs.map((item, index) => (
               <div key={index} className="flex items-center gap-2">
                 {index > 0 && (
-                  <span className="text-slate-400">/</span>
+                  <span className="text-gray-400">/</span>
                 )}
                 {item.path ? (
                   <a
                     href={item.path}
-                    className="text-slate-600 hover:text-slate-900 transition-colors"
+                    className="text-gray-500 hover:text-gray-900 transition-colors"
                   >
                     {item.label}
                   </a>
                 ) : (
-                  <span className="text-slate-900 font-medium">{item.label}</span>
+                  <span className="text-gray-900 font-medium">{item.label}</span>
                 )}
               </div>
             ))}
           </nav>
         )}
         {title && !breadcrumbs && (
-          <h1 className="text-lg font-semibold text-slate-900">{title}</h1>
+          <h1 className="text-lg font-semibold text-gray-900 tracking-tight">{title}</h1>
         )}
       </div>
 
@@ -66,32 +66,32 @@ export const Header = ({
       {showSearch && (
         <div className="flex-1 max-w-md mx-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input
               type="text"
               placeholder="Search..."
               onChange={(e) => onSearch?.(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-apple bg-gray-50 focus:bg-white focus:outline-none focus:border-system-blue focus:ring-2 focus:ring-system-blue/20 transition-all duration-200"
             />
           </div>
         </div>
       )}
 
       {/* Right side - Actions and User Menu */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         {actions && <div className="flex items-center gap-2">{actions}</div>}
 
         {/* Notifications */}
         <Button variant="ghost" size="sm" className="relative">
-          <Bell size={20} />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-danger-600 rounded-full" />
+          <Bell size={20} className="text-gray-600" />
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-system-red rounded-full" />
         </Button>
 
         {/* User Menu */}
-        <div className="flex items-center gap-3 pl-3 border-l border-slate-200">
+        <div className="flex items-center gap-3 pl-3 border-l border-gray-200">
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-medium text-slate-900">{user?.full_name || user?.email || 'User'}</p>
-            <p className="text-xs text-slate-500 capitalize">{user?.role || 'User'}</p>
+            <p className="text-sm font-medium text-gray-900">{user?.full_name || user?.email || 'User'}</p>
+            <p className="text-xs text-gray-500 capitalize">{user?.role || 'User'}</p>
           </div>
           <Avatar initials={user?.full_name ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U'} size="md" />
           <Button variant="ghost" size="sm" className="hidden sm:flex" onClick={logout} title="Logout">
@@ -120,23 +120,23 @@ export const PageHeader = ({
   className,
 }: PageHeaderProps) => {
   return (
-    <div className={twMerge(clsx('mb-6', className))}>
+    <div className={twMerge(clsx('mb-8', className))}>
       {breadcrumbs && breadcrumbs.length > 0 && (
-        <nav className="flex items-center gap-2 text-sm mb-2">
+        <nav className="flex items-center gap-2 text-sm mb-3">
           {breadcrumbs.map((item, index) => (
             <div key={index} className="flex items-center gap-2">
               {index > 0 && (
-                <span className="text-slate-400">/</span>
+                <span className="text-gray-400">/</span>
               )}
               {item.path ? (
                 <a
                   href={item.path}
-                  className="text-slate-600 hover:text-slate-900 transition-colors"
+                  className="text-gray-500 hover:text-gray-900 transition-colors"
                 >
                   {item.label}
                 </a>
               ) : (
-                <span className="text-slate-900 font-medium">{item.label}</span>
+                <span className="text-gray-900 font-medium">{item.label}</span>
               )}
             </div>
           ))}
@@ -144,9 +144,9 @@ export const PageHeader = ({
       )}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>
+          <h1 className="text-3xl font-semibold text-gray-900 tracking-tight">{title}</h1>
           {description && (
-            <p className="text-slate-600 mt-1">{description}</p>
+            <p className="text-base text-gray-500 mt-2 leading-relaxed max-w-2xl">{description}</p>
           )}
         </div>
         {actions && <div className="flex items-center gap-2">{actions}</div>}

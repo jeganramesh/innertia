@@ -3,17 +3,19 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
-  variant?: 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'outline';
+  variant?: 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'outline' | 'tinted';
   size?: 'sm' | 'md' | 'lg';
 }
 
+// Apple-style badge variants with system colors
 const badgeVariants = {
-  default: 'bg-slate-100 text-slate-700 border-slate-200',
-  primary: 'bg-blue-100 text-blue-700 border-blue-200',
-  success: 'bg-success-100 text-success-700 border-success-200',
-  warning: 'bg-warning-100 text-warning-700 border-warning-200',
-  danger: 'bg-danger-100 text-danger-700 border-danger-200',
-  outline: 'bg-transparent text-slate-700 border-slate-300',
+  default: 'bg-gray-100 text-gray-700 border-gray-200',
+  primary: 'bg-system-blue/10 text-system-blue border-system-blue/20',
+  success: 'bg-system-green/10 text-system-green border-system-green/20',
+  warning: 'bg-system-orange/10 text-system-orange border-system-orange/20',
+  danger: 'bg-system-red/10 text-system-red border-system-red/20',
+  outline: 'bg-transparent text-gray-700 border-gray-300',
+  tinted: 'bg-system-purple/10 text-system-purple border-system-purple/20',
 };
 
 const badgeSizes = {
@@ -96,7 +98,7 @@ export const Avatar = forwardRef<HTMLDivElement, AvatarProps>(
         ref={ref}
         className={twMerge(
           clsx(
-            'rounded-full bg-slate-200 flex items-center justify-center font-medium text-slate-600 overflow-hidden',
+            'rounded-full bg-gray-200 flex items-center justify-center font-medium text-gray-600 overflow-hidden',
             avatarSizes[size],
             className
           )
@@ -125,7 +127,7 @@ interface SkeletonProps extends HTMLAttributes<HTMLDivElement> {
 const skeletonVariants = {
   text: 'h-4 rounded',
   circular: 'rounded-full',
-  rectangular: 'rounded',
+  rectangular: 'rounded-apple',
 };
 
 export const Skeleton = forwardRef<HTMLDivElement, SkeletonProps>(
@@ -135,7 +137,7 @@ export const Skeleton = forwardRef<HTMLDivElement, SkeletonProps>(
         ref={ref}
         className={twMerge(
           clsx(
-            'bg-slate-200 animate-pulse',
+            'bg-gray-200 animate-pulse',
             skeletonVariants[variant],
             className
           )
@@ -165,10 +167,10 @@ const progressSizes = {
 };
 
 const progressColors = {
-  primary: 'bg-blue-700',
-  success: 'bg-success-700',
-  warning: 'bg-warning-700',
-  danger: 'bg-danger-700',
+  primary: 'bg-system-blue',
+  success: 'bg-system-green',
+  warning: 'bg-system-orange',
+  danger: 'bg-system-red',
 };
 
 export const ProgressBar = forwardRef<HTMLDivElement, ProgressBarProps>(
@@ -189,7 +191,7 @@ export const ProgressBar = forwardRef<HTMLDivElement, ProgressBarProps>(
     return (
       <div ref={ref} className="w-full">
         {showLabel && (
-          <div className="flex justify-between text-sm text-slate-600 mb-1">
+          <div className="flex justify-between text-sm text-gray-600 mb-1">
             <span>Progress</span>
             <span>{Math.round(percentage)}%</span>
           </div>
@@ -197,7 +199,7 @@ export const ProgressBar = forwardRef<HTMLDivElement, ProgressBarProps>(
         <div
           className={twMerge(
             clsx(
-              'w-full bg-slate-200 rounded-full overflow-hidden',
+              'w-full bg-gray-200 rounded-full overflow-hidden',
               progressSizes[size],
               className
             )
@@ -207,7 +209,7 @@ export const ProgressBar = forwardRef<HTMLDivElement, ProgressBarProps>(
           <div
             className={twMerge(
               clsx(
-                'h-full transition-all duration-300 ease-out',
+                'h-full transition-all duration-300 ease-out rounded-full',
                 progressColors[color]
               )
             )}

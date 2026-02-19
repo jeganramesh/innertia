@@ -168,7 +168,7 @@ export const authService = {
   /**
    * Create mock response for development
    */
-  createMockResponse(credentials: typeof TEST_CREDENTIALS.student): AuthResponse {
+  createMockResponse(credentials: { email: string; password: string; role: 'student' | 'faculty' | 'admin'; full_name: string }): AuthResponse {
     const mockToken = `mock-${credentials.role}-token-${Date.now()}`;
     const mockUser: User = {
       id: Math.random().toString(36).substr(2, 9),

@@ -33,15 +33,15 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="block text-sm font-medium text-slate-700 mb-1"
+            className="block text-sm font-medium text-gray-700 mb-1.5"
           >
             {label}
           </label>
         )}
         <div className="relative">
           {leftIcon && (
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <span className="text-slate-400">{leftIcon}</span>
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <span className="text-gray-400">{leftIcon}</span>
             </div>
           )}
           <input
@@ -50,13 +50,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             id={inputId}
             className={twMerge(
               clsx(
-                'w-full px-4 py-2 text-sm border rounded-lg transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2',
-                'bg-white text-slate-900 placeholder-slate-400',
-                'border-slate-300 focus:border-blue-500 focus:ring-blue-500',
-                hasError &&
-                  'border-danger-500 focus:border-danger-500 focus:ring-danger-500',
-                leftIcon && 'pl-10',
-                rightIcon && 'pr-10',
+                'w-full px-4 py-2.5 text-base font-normal rounded-apple',
+                'bg-white text-gray-900 placeholder-gray-400',
+                'border border-gray-200',
+                'transition-all duration-200 ease-out',
+                'focus:outline-none focus:border-system-blue focus:ring-2 focus:ring-system-blue/20',
+                hasError && 'border-system-red focus:border-system-red focus:ring-system-red/20',
+                leftIcon && 'pl-11',
+                rightIcon && 'pr-11',
                 'disabled:opacity-50 disabled:cursor-not-allowed',
                 className
               )
@@ -64,16 +65,16 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             {...props}
           />
           {rightIcon && (
-            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-              <span className="text-slate-400">{rightIcon}</span>
+            <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
+              <span className="text-gray-400">{rightIcon}</span>
             </div>
           )}
         </div>
         {error && (
-          <p className="mt-1 text-sm text-danger-600">{error}</p>
+          <p className="mt-1.5 text-sm text-system-red">{error}</p>
         )}
         {helperText && !error && (
-          <p className="mt-1 text-sm text-slate-500">{helperText}</p>
+          <p className="mt-1.5 text-sm text-gray-500">{helperText}</p>
         )}
       </div>
     );
@@ -110,7 +111,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
         {label && (
           <label
             htmlFor={textareaId}
-            className="block text-sm font-medium text-slate-700 mb-1"
+            className="block text-sm font-medium text-gray-700 mb-1.5"
           >
             {label}
           </label>
@@ -121,11 +122,12 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           rows={rows}
           className={twMerge(
             clsx(
-              'w-full px-4 py-2 text-sm border rounded-lg transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 resize-y',
-              'bg-white text-slate-900 placeholder-slate-400',
-              'border-slate-300 focus:border-blue-500 focus:ring-blue-500',
-              hasError &&
-                'border-danger-500 focus:border-danger-500 focus:ring-danger-500',
+              'w-full px-4 py-2.5 text-base font-normal rounded-apple',
+              'bg-white text-gray-900 placeholder-gray-400',
+              'border border-gray-200',
+              'transition-all duration-200 ease-out resize-y',
+              'focus:outline-none focus:border-system-blue focus:ring-2 focus:ring-system-blue/20',
+              hasError && 'border-system-red focus:border-system-red focus:ring-system-red/20',
               'disabled:opacity-50 disabled:cursor-not-allowed',
               className
             )
@@ -133,10 +135,10 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           {...props}
         />
         {error && (
-          <p className="mt-1 text-sm text-danger-600">{error}</p>
+          <p className="mt-1.5 text-sm text-system-red">{error}</p>
         )}
         {helperText && !error && (
-          <p className="mt-1 text-sm text-slate-500">{helperText}</p>
+          <p className="mt-1.5 text-sm text-gray-500">{helperText}</p>
         )}
       </div>
     );
@@ -182,7 +184,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         {label && (
           <label
             htmlFor={selectId}
-            className="block text-sm font-medium text-slate-700 mb-1"
+            className="block text-sm font-medium text-gray-700 mb-1.5"
           >
             {label}
           </label>
@@ -192,11 +194,12 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           id={selectId}
           className={twMerge(
             clsx(
-              'w-full px-4 py-2 text-sm border rounded-lg transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2',
-              'bg-white text-slate-900',
-              'border-slate-300 focus:border-blue-500 focus:ring-blue-500',
-              hasError &&
-                'border-danger-500 focus:border-danger-500 focus:ring-danger-500',
+              'w-full px-4 py-2.5 text-base font-normal rounded-apple',
+              'bg-white text-gray-900',
+              'border border-gray-200',
+              'transition-all duration-200 ease-out',
+              'focus:outline-none focus:border-system-blue focus:ring-2 focus:ring-system-blue/20',
+              hasError && 'border-system-red focus:border-system-red focus:ring-system-red/20',
               'disabled:opacity-50 disabled:cursor-not-allowed',
               className
             )
@@ -217,10 +220,10 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           ))}
         </select>
         {error && (
-          <p className="mt-1 text-sm text-danger-600">{error}</p>
+          <p className="mt-1.5 text-sm text-system-red">{error}</p>
         )}
         {helperText && !error && (
-          <p className="mt-1 text-sm text-slate-500">{helperText}</p>
+          <p className="mt-1.5 text-sm text-gray-500">{helperText}</p>
         )}
       </div>
     );

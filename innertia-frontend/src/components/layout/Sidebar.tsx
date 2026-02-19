@@ -180,7 +180,7 @@ export const Sidebar = memo(({ className, onCollapseChange }: SidebarProps) => {
         <div className="flex items-center h-16 px-4">
           {!isCollapsed ? (
             <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-[8px] bg-[#0071e3] flex items-center justify-center">
+              <div className="w-7 h-7 rounded-[8px] bg-system-blue flex items-center justify-center">
                 <span className="text-white font-semibold text-[13px]">I</span>
               </div>
               <div className="flex flex-col">
@@ -253,7 +253,7 @@ export const Sidebar = memo(({ className, onCollapseChange }: SidebarProps) => {
       {/* Mobile menu button - Apple floating style */}
       <button
         onClick={toggleMobile}
-        className="lg:hidden fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-[#0071e3] text-white shadow-[0_4px_12px_rgba(0,0,0,0.15)] flex items-center justify-center hover:bg-[#0077ed] transition-all duration-200 ease-out active:scale-95"
+        className="lg:hidden fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-system-blue text-white shadow-apple-md flex items-center justify-center hover:bg-blue-600 transition-all duration-200 ease-out active:scale-95"
         aria-label={isMobileOpen ? 'Close menu' : 'Open menu'}
         aria-expanded={isMobileOpen}
       >

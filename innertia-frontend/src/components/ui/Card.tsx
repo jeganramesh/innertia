@@ -3,18 +3,19 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 interface CardProps extends HTMLAttributes<HTMLDivElement> {
-  variant?: 'default' | 'elevated' | 'bordered';
+  variant?: 'default' | 'elevated' | 'bordered' | 'glass';
 }
 
 const cardVariants = {
-  default: 'bg-white border border-slate-200',
-  elevated: 'bg-white shadow-md',
-  bordered: 'bg-white border-2 border-slate-300',
+  default: 'bg-white border border-gray-200',
+  elevated: 'bg-white shadow-apple-md',
+  bordered: 'bg-white border-2 border-gray-300',
+  glass: 'bg-white/80 backdrop-blur-xl border border-white/20',
 };
 
 export const Card = forwardRef<HTMLDivElement, CardProps>(
   ({ className, variant = 'default', children, ...props }, ref) => {
-    const baseStyles = 'rounded-lg overflow-hidden';
+    const baseStyles = 'rounded-apple overflow-hidden transition-all duration-200 ease-out';
     const variantStyles = cardVariants[variant];
 
     return (
@@ -38,7 +39,7 @@ export const CardHeader = forwardRef<HTMLDivElement, CardHeaderProps>(
     return (
       <div
         ref={ref}
-        className={twMerge(clsx('px-6 py-4 border-b border-slate-200', className))}
+        className={twMerge(clsx('px-6 py-4 border-b border-gray-200', className))}
         {...props}
       >
         {children}
@@ -57,9 +58,9 @@ export const CardTitle = forwardRef<HTMLHeadingElement, CardTitleProps>(
   ({ className, as = 'h3', children, ...props }, ref) => {
     const Tag = as;
     const headingStyles = {
-      h1: 'text-2xl font-semibold',
-      h2: 'text-xl font-semibold',
-      h3: 'text-lg font-semibold',
+      h1: 'text-2xl font-semibold tracking-tight',
+      h2: 'text-xl font-semibold tracking-tight',
+      h3: 'text-lg font-semibold tracking-tight',
       h4: 'text-base font-semibold',
       h5: 'text-sm font-semibold',
       h6: 'text-xs font-semibold',
@@ -68,7 +69,7 @@ export const CardTitle = forwardRef<HTMLHeadingElement, CardTitleProps>(
     return (
       <Tag
         ref={ref}
-        className={twMerge(clsx('text-slate-900', headingStyles[as], className))}
+        className={twMerge(clsx('text-gray-900', headingStyles[as], className))}
         {...props}
       >
         {children}
@@ -86,7 +87,7 @@ export const CardDescription = forwardRef<HTMLParagraphElement, CardDescriptionP
     return (
       <p
         ref={ref}
-        className={twMerge(clsx('text-sm text-slate-600 mt-1', className))}
+        className={twMerge(clsx('text-sm text-gray-500 mt-1', className))}
         {...props}
       >
         {children}
@@ -122,7 +123,7 @@ export const CardFooter = forwardRef<HTMLDivElement, CardFooterProps>(
     return (
       <div
         ref={ref}
-        className={twMerge(clsx('px-6 py-4 border-t border-slate-200', className))}
+        className={twMerge(clsx('px-6 py-4 border-t border-gray-200', className))}
         {...props}
       >
         {children}
