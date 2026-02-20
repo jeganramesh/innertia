@@ -137,17 +137,25 @@ class ClassOut(BaseModel):
 class DashboardStats(BaseModel):
     """Schema for admin dashboard statistics."""
     total_users: int
+    total_students: int
+    total_faculty: int
+    total_admins: int
     total_classes: int
     total_sessions: int
     active_sessions: int
+    last_30_day_sessions: int
     users_by_role: dict
     
     model_config = ConfigDict(json_schema_extra={
         "example": {
             "total_users": 100,
+            "total_students": 80,
+            "total_faculty": 15,
+            "total_admins": 5,
             "total_classes": 10,
             "total_sessions": 50,
             "active_sessions": 2,
+            "last_30_day_sessions": 15,
             "users_by_role": {
                 "admin": 5,
                 "faculty": 15,
@@ -155,3 +163,30 @@ class DashboardStats(BaseModel):
             }
         }
     })
+
+
+# ============ Session Monitoring Schemas ============
+
+class SessionMonitorOut(BaseModel):
+    """Schema for session monitoring response."""
+    id: str
+    class_id: str
+    class_name: str
+    faculty_id: str
+    faculty_name: str
+    started_at: datetime
+    ended_at: Optional[datetime]
+    is_active: bool
+    duration_minutes: Optional[int] = None
+    student_count: int = 0
+    engagement_percent: Optional[float] = None
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SessionListResponse(BaseModel):
+    """Schema for paginated session list."""
+    sessions: List[SessionMonitorOut]
+    total: int
+    page: int
+    page_size: int

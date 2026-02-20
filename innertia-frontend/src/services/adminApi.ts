@@ -6,8 +6,8 @@
 
 import axios, { AxiosInstance } from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
-const API_V1_PREFIX = '/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_PREFIX = '/api/v1';
 
 // Types matching backend schemas
 export interface UserCreateAdmin {
@@ -71,9 +71,13 @@ export interface ClassOut {
 
 export interface DashboardStats {
   total_users: number;
+  total_students: number;
+  total_faculty: number;
+  total_admins: number;
   total_classes: number;
   total_sessions: number;
   active_sessions: number;
+  last_30_day_sessions: number;
   users_by_role: {
     admin: number;
     faculty: number;
@@ -81,10 +85,31 @@ export interface DashboardStats {
   };
 }
 
+export interface SessionMonitorOut {
+  id: string;
+  class_id: string;
+  class_name: string;
+  faculty_id: string;
+  faculty_name: string;
+  started_at: string;
+  ended_at?: string;
+  is_active: boolean;
+  duration_minutes?: number;
+  student_count: number;
+  engagement_percent?: number;
+}
+
+export interface SessionListResponse {
+  sessions: SessionMonitorOut[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
 // Create axios instance with interceptors
 const createAdminApiClient = (): AxiosInstance => {
   const client = axios.create({
-    baseURL: `${API_BASE_URL}${API_V1_PREFIX}`,
+    baseURL: `${API_BASE_URL}${API_PREFIX}`,
     headers: {
       'Content-Type': 'application/json',
     },
@@ -138,7 +163,8 @@ export const adminApiService = {
     page?: number;
     page_size?: number;
     role?: string;
-    is_active?: boolean;
+    status?: string;
+    search?: string;
   }): Promise<UserListResponse> {
     const response = await adminApi.get<UserListResponse>('/admin/users', { params });
     return response.data;
@@ -235,7 +261,31 @@ export const adminApiService = {
    * Get dashboard statistics
    */
   async getDashboardStats(): Promise<DashboardStats> {
-    const response = await adminApi.get<DashboardStats>('/admin/dashboard/stats');
+    const response = await adminApi.get<DashboardStats>('/admin/dashboard');
+    return response.data;
+  },
+
+  // ============ Session Monitoring ============
+
+  /**
+   * Get session monitoring list
+   */
+  async getSessions(params?: {
+    page?: number;
+    page_size?: number;
+    is_active?: boolean;
+  }): Promise<SessionListResponse> {
+    const response = await adminApi.get<SessionListResponse>('/admin/sessions', { params });
+    return response.data;
+  },
+
+  // ============ User Toggle ============
+
+  /**
+   * Toggle user active status
+   */
+  async toggleUser(userId: string): Promise<UserOutAdmin> {
+    const response = await adminApi.patch<UserOutAdmin>(`/admin/users/${userId}/toggle`);
     return response.data;
   }
 };

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { 
@@ -15,45 +15,57 @@ import {
   Download,
   ChevronRight
 } from 'lucide-react';
-import { StudentClass, StudentSession, StudentStats, StudentAttendanceRecord } from './types';
+import { studentApiService, StudentDashboard as StudentDashboardType } from '../../services/studentApi';
 import { useNavigate } from 'react-router-dom';
 
-// Mock data
-const mockStats: StudentStats = {
-  totalClasses: 4,
-  sessionsAttended: 28,
-  sessionsMissed: 2,
-  averageAttendance: 93
-};
-
-const mockClasses: StudentClass[] = [
-  { id: '1', name: 'Introduction to Programming', code: 'CS101', facultyName: 'Dr. John Smith', schedule: 'Mon, Wed 9:00 AM', status: 'active' },
-  { id: '2', name: 'Data Structures', code: 'CS201', facultyName: 'Dr. Jane Doe', schedule: 'Tue, Thu 10:00 AM', status: 'active' },
-  { id: '3', name: 'Web Development', code: 'CS301', facultyName: 'Prof. Mary Johnson', schedule: 'Mon, Wed 2:00 PM', status: 'active' },
-  { id: '4', name: 'Algorithm Design', code: 'CS401', facultyName: 'Dr. Robert Brown', schedule: 'Fri 11:00 AM', status: 'active' },
-];
-
-const mockActiveSession: StudentSession | null = {
-  id: 'sess-1',
-  classId: '1',
-  className: 'CS101 - Introduction to Programming',
-  facultyName: 'Dr. John Smith',
-  startTime: new Date().toISOString(),
-  status: 'active'
-};
-
-const mockAttendanceHistory: StudentAttendanceRecord[] = [
-  { id: '1', classId: '1', className: 'CS101 - Introduction to Programming', date: '2024-02-17', status: 'present', percentage: 95 },
-  { id: '2', classId: '2', className: 'CS201 - Data Structures', date: '2024-02-16', status: 'present', percentage: 88 },
-  { id: '3', classId: '3', className: 'CS301 - Web Development', date: '2024-02-15', status: 'late', percentage: 72 },
-  { id: '4', classId: '1', className: 'CS101 - Introduction to Programming', date: '2024-02-14', status: 'present', percentage: 91 },
-];
+// Transform API response to component format
+const transformDashboard = (apiData: StudentDashboardType) => ({
+  stats: {
+    totalClasses: apiData.total_classes,
+    sessionsAttended: 0, // Would need separate calculation
+    sessionsMissed: 0,
+    averageAttendance: 0
+  },
+  activeSession: apiData.active_session ? {
+    id: apiData.active_session.id,
+    classId: apiData.active_session.class_id,
+    className: apiData.active_session.class_name,
+    facultyName: '',
+    startTime: apiData.active_session.started_at,
+    status: apiData.active_session.is_active ? 'active' : 'completed'
+  } : null,
+  classes: [], // Would need separate API call for enrolled classes
+  recentNotes: apiData.recent_notes || []
+});
 
 export const StudentDashboard = () => {
   const navigate = useNavigate();
-  const [stats] = useState<StudentStats>(mockStats);
-  const [classes] = useState<StudentClass[]>(mockClasses);
-  const [activeSession, setActiveSession] = useState<StudentSession | null>(mockActiveSession);
+  const [stats, setStats] = useState({
+    totalClasses: 0,
+    sessionsAttended: 0,
+    sessionsMissed: 0,
+    averageAttendance: 0
+  });
+  const [activeSession, setActiveSession] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        setIsLoading(true);
+        const data = await studentApiService.getDashboard();
+        const transformed = transformDashboard(data);
+        setStats(transformed.stats);
+        setActiveSession(transformed.activeSession);
+      } catch (error) {
+        console.error('Failed to fetch dashboard:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDashboard();
+  }, []);
 
   const statCards = [
     { title: 'Enrolled Classes', value: stats.totalClasses, icon: BookOpen, color: 'bg-blue-500' },

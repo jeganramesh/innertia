@@ -48,6 +48,39 @@ TEST_USERS = [
         "is_active": True,
         "is_verified": True,
     },
+    # Additional demo users for frontend mock data
+    {
+        "email": "admin@innertia.com",
+        "password": "admin123",
+        "name": "System Admin",
+        "role": "admin",
+        "is_active": True,
+        "is_verified": True,
+    },
+    {
+        "email": "prof.johnson@innertia.com",
+        "password": "faculty123",
+        "name": "Dr. Sarah Johnson",
+        "role": "faculty",
+        "is_active": True,
+        "is_verified": True,
+    },
+    {
+        "email": "jane.doe@student.innertia.com",
+        "password": "student123",
+        "name": "Jane Doe",
+        "role": "student",
+        "is_active": True,
+        "is_verified": True,
+    },
+    {
+        "email": "mark.smith@student.innertia.com",
+        "password": "student123",
+        "name": "Mark Smith",
+        "role": "student",
+        "is_active": False,
+        "is_verified": True,
+    },
 ]
 
 

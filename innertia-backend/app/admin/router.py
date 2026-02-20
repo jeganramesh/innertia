@@ -1,29 +1,31 @@
 """
 Admin routes.
-Handles user management, bulk uploads, and class management.
+Handles user management, bulk uploads, class management, and session monitoring.
 """
 
 import io
+import json
 import uuid
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pandas as pd
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, or_
 from sqlalchemy.exc import IntegrityError
 
 from app.core.database import get_db
-from app.accounts.dependencies import require_admin
-from app.models.models import User
+from app.accounts.dependencies import require_admin, get_current_user
+from app.models.models import User, RoleEnum, Class, Session as SessionModel, Enrollment
 from app.accounts.utils import hash_password
-from app.models.models import Class, Session as SessionModel, Enrollment
 from app.admin.schemas import (
     UserCreateAdmin, UserUpdateAdmin, UserOutAdmin, UserListResponse,
-    BulkUploadResponse, ClassCreate, ClassUpdate, ClassOut, DashboardStats
+    BulkUploadResponse, ClassCreate, ClassUpdate, ClassOut, DashboardStats,
+    SessionMonitorOut, SessionListResponse
 )
+from app.admin.service import log_admin_action, AdminService
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -38,14 +40,21 @@ router = APIRouter(prefix="/admin", tags=["Admin"])
 )
 async def create_user(
     user_data: UserCreateAdmin,
-    db: AsyncSession = Depends(get_db)
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Create a new user (admin only).
     """
     # Check if user already exists
     result = await db.execute(
-        select(User).where(User.email == user_data.email)
+        select(User).where(
+            and_(
+                User.email == user_data.email,
+                User.deleted_at.is_(None)
+            )
+        )
     )
     existing_user = result.scalar_one_or_none()
     
@@ -60,8 +69,8 @@ async def create_user(
     
     new_user = User(
         email=user_data.email,
-        password_hash=hashed_password,
-        name=user_data.name,
+        hashed_password=hashed_password,
+        full_name=user_data.name,
         role=user_data.role,
         is_active=user_data.is_active
     )
@@ -77,11 +86,26 @@ async def create_user(
             detail="User with this email already exists"
         )
     
+    # Log the action
+    await log_admin_action(
+        db=db,
+        performed_by=current_user.id,
+        action="CREATE_USER",
+        target_type="user",
+        target_id=str(new_user.id),
+        details={
+            "email": new_user.email,
+            "role": new_user.role.value if hasattr(new_user.role, 'value') else str(new_user.role),
+            "is_active": new_user.is_active
+        },
+        ip_address=request.client.host if request.client else None
+    )
+    
     return UserOutAdmin(
         id=str(new_user.id),
         email=new_user.email,
-        name=new_user.name,
-        role=new_user.role,
+        name=new_user.full_name,
+        role=new_user.role.value if hasattr(new_user.role, 'value') else str(new_user.role),
         is_active=new_user.is_active,
         created_at=new_user.created_at,
         updated_at=new_user.updated_at
@@ -97,35 +121,41 @@ async def list_users(
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
     role: Optional[str] = Query(None),
-    is_active: Optional[bool] = Query(None),
+    status: Optional[str] = Query(None),  # active/inactive
     search: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db)
 ):
     """
     List all users with pagination and filters (admin only).
+    Excludes soft-deleted users.
     """
-    # Build query
-    query = select(User)
-    count_query = select(func.count(User.id))
+    # Build query - exclude soft deleted users
+    query = select(User).where(User.deleted_at.is_(None))
+    count_query = select(func.count(User.id)).where(User.deleted_at.is_(None))
     
     # Apply filters
-    if role:
+    if role and role != 'all':
         query = query.where(User.role == role)
         count_query = count_query.where(User.role == role)
     
-    if is_active is not None:
+    if status is not None:
+        is_active = status.lower() == 'active'
         query = query.where(User.is_active == is_active)
         count_query = count_query.where(User.is_active == is_active)
     
     if search:
         search_filter = f"%{search}%"
         query = query.where(
-            (User.email.ilike(search_filter)) | 
-            (User.name.ilike(search_filter))
+            or_(
+                User.email.ilike(search_filter),
+                User.full_name.ilike(search_filter)
+            )
         )
         count_query = count_query.where(
-            (User.email.ilike(search_filter)) | 
-            (User.name.ilike(search_filter))
+            or_(
+                User.email.ilike(search_filter),
+                User.full_name.ilike(search_filter)
+            )
         )
     
     # Get total count
@@ -144,8 +174,8 @@ async def list_users(
         UserOutAdmin(
             id=str(u.id),
             email=u.email,
-            name=u.name,
-            role=u.role,
+            name=u.full_name,
+            role=u.role.value if hasattr(u.role, 'value') else str(u.role),
             is_active=u.is_active,
             created_at=u.created_at,
             updated_at=u.updated_at
@@ -182,7 +212,12 @@ async def get_user(
         )
     
     result = await db.execute(
-        select(User).where(User.id == user_uuid)
+        select(User).where(
+            and_(
+                User.id == user_uuid,
+                User.deleted_at.is_(None)
+            )
+        )
     )
     user = result.scalar_one_or_none()
     
@@ -195,8 +230,8 @@ async def get_user(
     return UserOutAdmin(
         id=str(user.id),
         email=user.email,
-        name=user.name,
-        role=user.role,
+        name=user.full_name,
+        role=user.role.value if hasattr(user.role, 'value') else str(user.role),
         is_active=user.is_active,
         created_at=user.created_at,
         updated_at=user.updated_at
@@ -211,10 +246,13 @@ async def get_user(
 async def update_user(
     user_id: str,
     user_data: UserUpdateAdmin,
-    db: AsyncSession = Depends(get_db)
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Update a user (admin only).
+    Cannot change own role (prevent admin lockout).
     """
     try:
         user_uuid = uuid.UUID(user_id)
@@ -235,9 +273,23 @@ async def update_user(
             detail="User not found"
         )
     
+    # Security check: Cannot change own role
+    if user.id == current_user.id and user_data.role is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot change your own role"
+        )
+    
+    # Store previous values for audit
+    previous_values = {
+        "name": user.full_name,
+        "role": user.role.value if hasattr(user.role, 'value') else str(user.role),
+        "is_active": user.is_active
+    }
+    
     # Update fields
     if user_data.name is not None:
-        user.name = user_data.name
+        user.full_name = user_data.name
     if user_data.role is not None:
         user.role = user_data.role
     if user_data.is_active is not None:
@@ -248,11 +300,124 @@ async def update_user(
     await db.commit()
     await db.refresh(user)
     
+    # Log the action
+    await log_admin_action(
+        db=db,
+        performed_by=current_user.id,
+        action="UPDATE_USER",
+        target_type="user",
+        target_id=str(user.id),
+        details={
+            "previous_values": previous_values,
+            "new_values": {
+                "name": user.full_name,
+                "role": user.role.value if hasattr(user.role, 'value') else str(user.role),
+                "is_active": user.is_active
+            }
+        },
+        ip_address=request.client.host if request.client else None
+    )
+    
     return UserOutAdmin(
         id=str(user.id),
         email=user.email,
-        name=user.name,
-        role=user.role,
+        name=user.full_name,
+        role=user.role.value if hasattr(user.role, 'value') else str(user.role),
+        is_active=user.is_active,
+        created_at=user.created_at,
+        updated_at=user.updated_at
+    )
+
+
+@router.patch(
+    "/users/{user_id}/toggle",
+    response_model=UserOutAdmin,
+    dependencies=[Depends(require_admin)]
+)
+async def toggle_user(
+    user_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Toggle user active/inactive status (admin only).
+    Cannot disable own account.
+    Cannot disable last admin.
+    """
+    try:
+        user_uuid = uuid.UUID(user_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid user ID format"
+        )
+    
+    result = await db.execute(
+        select(User).where(User.id == user_uuid)
+    )
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Security check: Cannot disable own account
+    if user.id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot disable your own account"
+        )
+    
+    # Security check: Cannot disable last admin
+    if user.is_active and user.role == RoleEnum.ADMIN:
+        # Check if this is the last active admin
+        admin_count_result = await db.execute(
+            select(func.count(User.id)).where(
+                and_(
+                    User.role == RoleEnum.ADMIN,
+                    User.is_active == True,
+                    User.deleted_at.is_(None)
+                )
+            )
+        )
+        admin_count = admin_count_result.scalar()
+        
+        if admin_count <= 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot disable the last admin account"
+            )
+    
+    # Toggle status
+    user.is_active = not user.is_active
+    user.updated_at = datetime.utcnow()
+    
+    await db.commit()
+    await db.refresh(user)
+    
+    # Log the action
+    action = "ENABLE_USER" if user.is_active else "DISABLE_USER"
+    await log_admin_action(
+        db=db,
+        performed_by=current_user.id,
+        action=action,
+        target_type="user",
+        target_id=str(user.id),
+        details={
+            "email": user.email,
+            "new_status": user.is_active
+        },
+        ip_address=request.client.host if request.client else None
+    )
+    
+    return UserOutAdmin(
+        id=str(user.id),
+        email=user.email,
+        name=user.full_name,
+        role=user.role.value if hasattr(user.role, 'value') else str(user.role),
         is_active=user.is_active,
         created_at=user.created_at,
         updated_at=user.updated_at
@@ -266,10 +431,14 @@ async def update_user(
 )
 async def delete_user(
     user_id: str,
-    db: AsyncSession = Depends(get_db)
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
-    Delete a user (admin only).
+    Soft delete a user (admin only).
+    Cannot delete own account.
+    Cannot delete last admin.
     """
     try:
         user_uuid = uuid.UUID(user_id)
@@ -290,8 +459,51 @@ async def delete_user(
             detail="User not found"
         )
     
-    await db.delete(user)
+    # Security check: Cannot delete own account
+    if user.id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete your own account"
+        )
+    
+    # Security check: Cannot delete last admin
+    if user.role == RoleEnum.ADMIN:
+        admin_count_result = await db.execute(
+            select(func.count(User.id)).where(
+                and_(
+                    User.role == RoleEnum.ADMIN,
+                    User.deleted_at.is_(None)
+                )
+            )
+        )
+        admin_count = admin_count_result.scalar()
+        
+        if admin_count <= 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot delete the last admin account"
+            )
+    
+    # Soft delete
+    user.deleted_at = datetime.utcnow()
+    user.is_active = False  # Also deactivate
+    user.updated_at = datetime.utcnow()
+    
     await db.commit()
+    
+    # Log the action
+    await log_admin_action(
+        db=db,
+        performed_by=current_user.id,
+        action="DELETE_USER",
+        target_type="user",
+        target_id=str(user.id),
+        details={
+            "email": user.email,
+            "role": user.role.value if hasattr(user.role, 'value') else str(user.role)
+        },
+        ip_address=request.client.host if request.client else None
+    )
     
     return None
 
@@ -305,13 +517,15 @@ async def delete_user(
 )
 async def bulk_upload_users(
     file: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db)
+    request: Request = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Bulk upload users from CSV or Excel file (admin only).
     
     Expected columns:
-    - name: User's name
+    - full_name: User's name
     - email: User's email (unique)
     - role: Role (student, faculty, admin)
     - is_active: Boolean (true/false or 1/0)
@@ -352,8 +566,8 @@ async def bulk_upload_users(
             detail=f"Failed to parse file: {str(e)}"
         )
     
-    # Validate columns
-    required_columns = ["name", "email", "role", "is_active"]
+    # Validate columns - support both full_name and name
+    required_columns = ["email", "role"]
     missing_cols = [col for col in required_columns if col not in df.columns]
     if missing_cols:
         raise HTTPException(
@@ -367,6 +581,12 @@ async def bulk_upload_users(
     failed_rows = []
     
     valid_roles = ["student", "faculty", "admin"]
+    
+    # Get existing emails for batch validation
+    existing_emails_result = await db.execute(
+        select(User.email).where(User.deleted_at.is_(None))
+    )
+    existing_emails = set(row[0] for row in existing_emails_result.fetchall())
     
     for idx, row in df.iterrows():
         row_num = idx + 2  # Account for header and 0-index
@@ -393,7 +613,7 @@ async def bulk_upload_users(
                 continue
             
             # Validate is_active
-            is_active_val = row["is_active"]
+            is_active_val = row.get("is_active", True)
             if isinstance(is_active_val, bool):
                 is_active = is_active_val
             elif isinstance(is_active_val, (int, float)):
@@ -401,33 +621,45 @@ async def bulk_upload_users(
             else:
                 is_active = str(is_active_val).lower() in ["true", "1", "yes"]
             
-            # Get name
-            name = str(row["name"]).strip() if pd.notna(row["name"]) else None
+            # Get full_name - support both "full_name" and "name" columns
+            full_name = None
+            if "full_name" in row and pd.notna(row.get("full_name")):
+                full_name = str(row["full_name"]).strip()
+            elif "name" in row and pd.notna(row.get("name")):
+                full_name = str(row["name"]).strip()
             
-            # Check if user exists
+            # Check if user exists (soft deleted users can be re-activated)
             result = await db.execute(
                 select(User).where(User.email == email)
             )
             existing_user = result.scalar_one_or_none()
             
             if existing_user:
-                # Update existing user
-                existing_user.name = name or existing_user.name
-                existing_user.role = role
-                existing_user.is_active = is_active
-                existing_user.updated_at = datetime.utcnow()
-                updated_count += 1
+                if existing_user.deleted_at is not None:
+                    # Reactivate soft-deleted user
+                    existing_user.deleted_at = None
+                    existing_user.full_name = full_name or existing_user.full_name
+                    existing_user.role = role
+                    existing_user.is_active = is_active
+                    existing_user.updated_at = datetime.utcnow()
+                    updated_count += 1
+                else:
+                    # Update existing active user
+                    existing_user.full_name = full_name or existing_user.full_name
+                    existing_user.role = role
+                    existing_user.is_active = is_active
+                    existing_user.updated_at = datetime.utcnow()
+                    updated_count += 1
             else:
                 # Create new user
-                # Generate a default password for new users
                 import secrets
                 default_password = secrets.token_urlsafe(8)
                 hashed_password = hash_password(default_password)
                 
                 new_user = User(
                     email=email,
-                    password_hash=hashed_password,
-                    name=name,
+                    hashed_password=hashed_password,
+                    full_name=full_name,
                     role=role,
                     is_active=is_active
                 )
@@ -442,6 +674,21 @@ async def bulk_upload_users(
     
     # Commit all changes
     await db.commit()
+    
+    # Log bulk upload event
+    await log_admin_action(
+        db=db,
+        performed_by=current_user.id,
+        action="BULK_UPLOAD_USERS",
+        target_type="user",
+        details={
+            "created": created_count,
+            "updated": updated_count,
+            "failed": len(failed_rows),
+            "filename": file.filename
+        },
+        ip_address=request.client.host if request and request.client else None
+    )
     
     return BulkUploadResponse(
         created_count=created_count,
@@ -476,7 +723,11 @@ async def create_class(
     
     result = await db.execute(
         select(User).where(
-            and_(User.id == faculty_uuid, User.role == "faculty")
+            and_(
+                User.id == faculty_uuid,
+                User.role == RoleEnum.FACULTY,
+                User.deleted_at.is_(None)
+            )
         )
     )
     faculty = result.scalar_one_or_none()
@@ -511,32 +762,195 @@ async def create_class(
 
 @router.get(
     "/classes",
-    response_model=list[ClassOut],
     dependencies=[Depends(require_admin)]
 )
 async def list_classes(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db)
 ):
     """
     List all classes (admin only).
     """
-    result = await db.execute(
-        select(Class).order_by(Class.created_at.desc())
-    )
+    # Build query - exclude soft deleted classes
+    query = select(Class).where(Class.deleted_at.is_(None))
+    count_query = select(func.count(Class.id)).where(Class.deleted_at.is_(None))
+    
+    # Get total count
+    total_result = await db.execute(count_query)
+    total = total_result.scalar()
+    
+    # Apply pagination
+    offset = (page - 1) * page_size
+    query = query.offset(offset).limit(page_size).order_by(Class.created_at.desc())
+    
+    # Execute query
+    result = await db.execute(query)
     classes = result.scalars().all()
     
-    return [
-        ClassOut(
-            id=str(c.id),
-            name=c.name,
-            description=c.description,
-            faculty_id=str(c.faculty_id),
-            is_active=c.is_active,
-            created_at=c.created_at,
-            updated_at=c.updated_at
-        )
+    class_list = [
+        {
+            "id": str(c.id),
+            "name": c.name,
+            "description": c.description,
+            "faculty_id": str(c.faculty_id),
+            "is_active": c.is_active,
+            "created_at": c.created_at,
+            "updated_at": c.updated_at
+        }
         for c in classes
     ]
+    
+    return {
+        "classes": class_list,
+        "total": total,
+        "page": page,
+        "page_size": page_size
+    }
+
+
+@router.get(
+    "/classes/{class_id}",
+    response_model=ClassOut,
+    dependencies=[Depends(require_admin)]
+)
+async def get_class(
+    class_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get a specific class by ID (admin only).
+    """
+    try:
+        class_uuid = uuid.UUID(class_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid class ID format"
+        )
+    
+    result = await db.execute(
+        select(Class).where(
+            and_(
+                Class.id == class_uuid,
+                Class.deleted_at.is_(None)
+            )
+        )
+    )
+    class_obj = result.scalar_one_or_none()
+    
+    if not class_obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Class not found"
+        )
+    
+    return ClassOut(
+        id=str(class_obj.id),
+        name=class_obj.name,
+        description=class_obj.description,
+        faculty_id=str(class_obj.faculty_id),
+        is_active=class_obj.is_active,
+        created_at=class_obj.created_at,
+        updated_at=class_obj.updated_at
+    )
+
+
+@router.patch(
+    "/classes/{class_id}",
+    response_model=ClassOut,
+    dependencies=[Depends(require_admin)]
+)
+async def update_class(
+    class_id: str,
+    class_data: ClassUpdate,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Update a class (admin only).
+    """
+    try:
+        class_uuid = uuid.UUID(class_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid class ID format"
+        )
+    
+    result = await db.execute(
+        select(Class).where(Class.id == class_uuid)
+    )
+    class_obj = result.scalar_one_or_none()
+    
+    if not class_obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Class not found"
+        )
+    
+    # Update fields
+    if class_data.name is not None:
+        class_obj.name = class_data.name
+    if class_data.description is not None:
+        class_obj.description = class_data.description
+    if class_data.is_active is not None:
+        class_obj.is_active = class_data.is_active
+    
+    class_obj.updated_at = datetime.utcnow()
+    
+    await db.commit()
+    await db.refresh(class_obj)
+    
+    return ClassOut(
+        id=str(class_obj.id),
+        name=class_obj.name,
+        description=class_obj.description,
+        faculty_id=str(class_obj.faculty_id),
+        is_active=class_obj.is_active,
+        created_at=class_obj.created_at,
+        updated_at=class_obj.updated_at
+    )
+
+
+@router.delete(
+    "/classes/{class_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_admin)]
+)
+async def delete_class(
+    class_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Soft delete a class (admin only).
+    """
+    try:
+        class_uuid = uuid.UUID(class_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid class ID format"
+        )
+    
+    result = await db.execute(
+        select(Class).where(Class.id == class_uuid)
+    )
+    class_obj = result.scalar_one_or_none()
+    
+    if not class_obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Class not found"
+        )
+    
+    # Soft delete
+    class_obj.deleted_at = datetime.utcnow()
+    class_obj.is_active = False
+    class_obj.updated_at = datetime.utcnow()
+    
+    await db.commit()
+    
+    return None
 
 
 # ============ Dashboard Endpoints ============
@@ -550,36 +964,143 @@ async def get_dashboard_stats(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Get admin dashboard statistics (admin only).
+    Get dashboard statistics (admin only).
     """
-    # Total users
-    result = await db.execute(select(func.count(User.id)))
-    total_users = result.scalar()
+    # Count users by role (excluding soft-deleted)
+    users_by_role = {}
+    for role in [RoleEnum.ADMIN, RoleEnum.FACULTY, RoleEnum.STUDENT]:
+        result = await db.execute(
+            select(func.count(User.id)).where(
+                and_(
+                    User.role == role,
+                    User.deleted_at.is_(None)
+                )
+            )
+        )
+        users_by_role[role.value] = result.scalar() or 0
     
-    # Users by role
-    role_result = await db.execute(
-        select(User.role, func.count(User.id)).group_by(User.role)
+    # Total users
+    total_users_result = await db.execute(
+        select(func.count(User.id)).where(User.deleted_at.is_(None))
     )
-    users_by_role = {row[0]: row[1] for row in role_result.all()}
+    total_users = total_users_result.scalar() or 0
     
     # Total classes
-    class_result = await db.execute(select(func.count(Class.id)))
-    total_classes = class_result.scalar()
+    total_classes_result = await db.execute(
+        select(func.count(Class.id)).where(Class.deleted_at.is_(None))
+    )
+    total_classes = total_classes_result.scalar() or 0
     
     # Total sessions
-    session_result = await db.execute(select(func.count(SessionModel.id)))
-    total_sessions = session_result.scalar()
+    total_sessions_result = await db.execute(
+        select(func.count(SessionModel.id))
+    )
+    total_sessions = total_sessions_result.scalar() or 0
     
     # Active sessions
-    active_result = await db.execute(
+    active_sessions_result = await db.execute(
         select(func.count(SessionModel.id)).where(SessionModel.is_active == True)
     )
-    active_sessions = active_result.scalar()
+    active_sessions = active_sessions_result.scalar() or 0
+    
+    # Last 30 day sessions
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    last_30_days_result = await db.execute(
+        select(func.count(SessionModel.id)).where(SessionModel.created_at >= thirty_days_ago)
+    )
+    last_30_day_sessions = last_30_days_result.scalar() or 0
     
     return DashboardStats(
         total_users=total_users,
+        total_students=users_by_role.get("student", 0),
+        total_faculty=users_by_role.get("faculty", 0),
+        total_admins=users_by_role.get("admin", 0),
         total_classes=total_classes,
         total_sessions=total_sessions,
         active_sessions=active_sessions,
+        last_30_day_sessions=last_30_day_sessions,
         users_by_role=users_by_role
+    )
+
+
+# ============ Session Monitoring Endpoints ============
+
+@router.get(
+    "/sessions",
+    response_model=SessionListResponse,
+    dependencies=[Depends(require_admin)]
+)
+async def list_sessions(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    is_active: Optional[bool] = Query(None),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    List all sessions with pagination (admin only).
+    """
+    # Build query
+    query = select(SessionModel)
+    count_query = select(func.count(SessionModel.id))
+    
+    # Apply filters
+    if is_active is not None:
+        query = query.where(SessionModel.is_active == is_active)
+        count_query = count_query.where(SessionModel.is_active == is_active)
+    
+    # Get total count
+    total_result = await db.execute(count_query)
+    total = total_result.scalar()
+    
+    # Apply pagination
+    offset = (page - 1) * page_size
+    query = query.offset(offset).limit(page_size).order_by(SessionModel.created_at.desc())
+    
+    # Execute query
+    result = await db.execute(query)
+    sessions = result.scalars().all()
+    
+    session_list = []
+    for session in sessions:
+        # Get class name
+        class_result = await db.execute(
+            select(Class).where(Class.id == session.class_id)
+        )
+        class_obj = class_result.scalar_one_or_none()
+        
+        # Get faculty name
+        faculty_result = await db.execute(
+            select(User).where(User.id == session.faculty_id)
+        )
+        faculty = faculty_result.scalar_one_or_none()
+        
+        # Get student count
+        student_count_result = await db.execute(
+            select(func.count(Enrollment.id)).where(Enrollment.class_id == session.class_id)
+        )
+        student_count = student_count_result.scalar() or 0
+        
+        # Calculate duration
+        duration_minutes = None
+        if session.start_time and session.end_time:
+            duration_minutes = int((session.end_time - session.start_time).total_seconds() / 60)
+        
+        session_list.append(SessionMonitorOut(
+            id=str(session.id),
+            class_id=str(session.class_id),
+            class_name=class_obj.name if class_obj else "Unknown",
+            faculty_id=str(session.faculty_id),
+            faculty_name=faculty.full_name if faculty and faculty.full_name else (faculty.name if faculty else "Unknown"),
+            started_at=session.start_time or session.started_at or session.created_at,
+            ended_at=session.end_time or session.ended_at,
+            is_active=session.is_active,
+            duration_minutes=duration_minutes,
+            student_count=student_count
+        ))
+    
+    return SessionListResponse(
+        sessions=session_list,
+        total=total,
+        page=page,
+        page_size=page_size
     )

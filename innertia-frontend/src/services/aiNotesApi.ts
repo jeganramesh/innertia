@@ -77,7 +77,7 @@ const aiNotesClient = axios.create({
 
 // Add auth interceptor
 aiNotesClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('auth_token');
+  const token = localStorage.getItem('access_token');
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -88,32 +88,32 @@ aiNotesClient.interceptors.request.use((config) => {
 export const aiNotesApi = {
   // Generate immersive notes
   generateNotes: async (data: GenerateRequest): Promise<GenerateResponse> => {
-    const response = await aiNotesClient.post<GenerateResponse>('/faculty/ai-notes/generate', data);
+    const response = await aiNotesClient.post<GenerateResponse>('/ai-notes/generate', data);
     return response.data;
   },
 
   // Save generated notes
   saveNotes: async (data: SaveNotesRequest): Promise<AINoteOut> => {
-    const response = await aiNotesClient.post<AINoteOut>('/faculty/ai-notes/save', data);
+    const response = await aiNotesClient.post<AINoteOut>('/ai-notes/save', data);
     return response.data;
   },
 
   // Get all AI notes
   getNotes: async (classId?: string): Promise<AINoteList> => {
     const params = classId ? { class_id: classId } : {};
-    const response = await aiNotesClient.get<AINoteList>('/faculty/ai-notes', { params });
+    const response = await aiNotesClient.get<AINoteList>('/ai-notes', { params });
     return response.data;
   },
 
   // Get specific AI note
   getNote: async (noteId: string): Promise<AINoteOut> => {
-    const response = await aiNotesClient.get<AINoteOut>(`/faculty/ai-notes/${noteId}`);
+    const response = await aiNotesClient.get<AINoteOut>(`/ai-notes/${noteId}`);
     return response.data;
   },
 
   // Delete AI note
   deleteNote: async (noteId: string): Promise<void> => {
-    await aiNotesClient.delete(`/faculty/ai-notes/${noteId}`);
+    await aiNotesClient.delete(`/ai-notes/${noteId}`);
   },
 };
 

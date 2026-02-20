@@ -10,18 +10,20 @@ import {
   TrendingUp,
   BarChart3
 } from 'lucide-react';
-import { AdminStats } from './types';
+import { adminApiService, DashboardStats } from '../../services/adminApi';
 
-// Mock data for demonstration
-const mockStats: AdminStats = {
-  totalUsers: 1250,
-  totalFaculties: 45,
-  totalStudents: 1180,
-  activeSessions: 8,
-  totalClasses: 120,
-  averageAttendance: 87.5,
-  violationCount: 23
-};
+// Transform API response to component format
+const transformStats = (apiStats: DashboardStats) => ({
+  totalUsers: apiStats.total_users,
+  totalFaculties: apiStats.total_faculty,
+  totalStudents: apiStats.total_students,
+  activeSessions: apiStats.active_sessions,
+  totalClasses: apiStats.total_classes,
+  totalSessions: apiStats.total_sessions,
+  last30DaySessions: apiStats.last_30_day_sessions,
+  averageAttendance: 0, // Would need separate calculation
+  violationCount: 0 // Would need separate endpoint
+});
 
 const recentActivity = [
   { id: 1, action: 'User Created', user: 'john.doe@edu.com', role: 'student', time: '2 min ago' },
@@ -40,8 +42,34 @@ const attendanceTrend = [
 ];
 
 export const AdminDashboard = () => {
-  const [stats, setStats] = useState<AdminStats>(mockStats);
-  const [isLoading, setIsLoading] = useState(false);
+  const [stats, setStats] = useState(transformStats({
+    total_users: 0,
+    total_students: 0,
+    total_faculty: 0,
+    total_admins: 0,
+    total_classes: 0,
+    total_sessions: 0,
+    active_sessions: 0,
+    last_30_day_sessions: 0,
+    users_by_role: { admin: 0, faculty: 0, student: 0 }
+  }));
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setIsLoading(true);
+        const data = await adminApiService.getDashboardStats();
+        setStats(transformStats(data));
+      } catch (error) {
+        console.error('Failed to fetch dashboard stats:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, []);
 
   const statCards = [
     { 

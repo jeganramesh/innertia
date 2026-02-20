@@ -87,6 +87,7 @@ const AdminRoutes = () => {
         <Route index element={<Navigate to="/admin/dashboard" replace />} />
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="users" element={<UsersPage />} />
+        <Route path="users/bulk-upload" element={<UserBulkUpload />} />
         <Route path="upload" element={<UserBulkUpload />} />
         <Route path="classes" element={<AdminClassesPage />} />
         <Route path="sessions" element={<AdminSessionsPage />} />

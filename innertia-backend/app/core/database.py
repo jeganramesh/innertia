@@ -1,6 +1,6 @@
 """
 Database connection and session management.
-Uses async SQLAlchemy for SQLite.
+Uses async SQLAlchemy for SQLite (dev) → PostgreSQL (prod).
 """
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
@@ -9,18 +9,24 @@ from typing import AsyncGenerator
 
 from app.core.config import settings
 
-# Base class for models - must be declared before importing models
-Base = declarative_base()
+# Import Base from models.base to avoid circular imports
+from app.models.base import Base
 
 # Import all models to register them with SQLAlchemy (after Base is defined)
+# This ensures all tables are created when Base.metadata.create_all is called
 from app.models.models import (
     User,
     RefreshToken,
     Class,
-    Session as SessionModel,
     Enrollment,
+    Session as SessionModel,
     SlideState,
-    Note
+    SlideActivity,
+    AINote,
+    AuditLog,
+    SystemSetting,
+    Note,
+    RoleEnum,
 )
 
 # Create async engine (SQLite doesn't need pool settings)

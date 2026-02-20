@@ -102,7 +102,7 @@ export const UserBulkUpload = () => {
 
   // Download template
   const handleDownloadTemplate = () => {
-    const csvContent = 'name,email,role,is_active\nJohn Doe,john.doe@example.com,student,true\nJane Smith,jane.smith@example.com,faculty,true\nAdmin User,admin@example.com,admin,true';
+    const csvContent = 'full_name,email,role,is_active\nJohn Doe,john.doe@example.com,student,true\nJane Smith,jane.smith@example.com,faculty,true\nAdmin User,admin@example.com,admin,true';
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -293,7 +293,7 @@ export const UserBulkUpload = () => {
         <div className="prose prose-sm max-w-none text-slate-600">
           <p className="mb-3">Your file must contain the following columns:</p>
           <ul className="list-disc pl-5 space-y-1">
-            <li><strong>name</strong> - User's full name</li>
+            <li><strong>full_name</strong> - User's full name</li>
             <li><strong>email</strong> - User's email address (must be unique)</li>
             <li><strong>role</strong> - User role: <code>student</code>, <code>faculty</code>, or <code>admin</code></li>
             <li><strong>is_active</strong> - Account status: <code>true</code> or <code>false</code></li>

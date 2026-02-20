@@ -12,46 +12,64 @@ import {
   ArrowRight,
   Plus
 } from 'lucide-react';
-import { FacultyClass, FacultySession, FacultyStats } from './types';
+import { facultyApiService, FacultyDashboard as FacultyDashboardType } from '../../services/facultyApi';
 import { useNavigate } from 'react-router-dom';
 
-// Mock data
-const mockStats: FacultyStats = {
-  totalClasses: 5,
-  activeClasses: 3,
-  totalSessions: 42,
-  totalStudents: 156,
-  averageAttendance: 89
-};
-
-const mockClasses: FacultyClass[] = [
-  { id: '1', name: 'Introduction to Programming', code: 'CS101', studentCount: 45, sessionCount: 15, lastSession: '2024-02-17', status: 'active' },
-  { id: '2', name: 'Data Structures', code: 'CS201', studentCount: 38, sessionCount: 12, lastSession: '2024-02-16', status: 'active' },
-  { id: '3', name: 'Web Development', code: 'CS301', studentCount: 32, sessionCount: 8, lastSession: '2024-02-15', status: 'active' },
-  { id: '4', name: 'Algorithm Design', code: 'CS401', studentCount: 28, sessionCount: 5, lastSession: '2024-02-14', status: 'active' },
-  { id: '5', name: 'Machine Learning', code: 'CS501', studentCount: 25, sessionCount: 2, lastSession: '2024-02-10', status: 'archived' },
-];
-
-const mockActiveSession: FacultySession | null = {
-  id: 'sess-1',
-  classId: '1',
-  className: 'CS101 - Introduction to Programming',
-  startTime: new Date().toISOString(),
-  status: 'active',
-  attendeeCount: 42,
-  syncedCount: 40,
-  focusPercentage: 87,
-  violationCount: 3,
-  currentSlide: 15,
-  totalSlides: 45,
-  slideLocked: true
-};
+// Transform API response to component format
+const transformDashboard = (apiData: FacultyDashboardType) => ({
+  stats: {
+    totalClasses: apiData.total_classes,
+    totalStudents: apiData.total_students,
+    activeClasses: apiData.active_session ? 1 : 0,
+    totalSessions: apiData.recent_sessions?.length || 0,
+    averageAttendance: 0 // Would need calculation
+  },
+  activeSession: apiData.active_session ? {
+    id: apiData.active_session.id,
+    classId: apiData.active_session.class_id,
+    className: `Class ${apiData.active_session.class_id}`,
+    startTime: apiData.active_session.started_at,
+    status: apiData.active_session.is_active ? 'active' : 'completed',
+    attendeeCount: 0, // Would need calculation
+    syncedCount: 0,
+    focusPercentage: 0,
+    violationCount: 0,
+    currentSlide: 0,
+    totalSlides: 0,
+    slideLocked: false
+  } : null,
+  classes: [] // Would need separate API call
+});
 
 export const FacultyDashboard = () => {
   const navigate = useNavigate();
-  const [stats] = useState<FacultyStats>(mockStats);
-  const [classes] = useState<FacultyClass[]>(mockClasses);
-  const [activeSession, setActiveSession] = useState<FacultySession | null>(mockActiveSession);
+  const [stats, setStats] = useState({
+    totalClasses: 0,
+    activeClasses: 0,
+    totalSessions: 0,
+    totalStudents: 0,
+    averageAttendance: 0
+  });
+  const [activeSession, setActiveSession] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        setIsLoading(true);
+        const data = await facultyApiService.getDashboard();
+        const transformed = transformDashboard(data);
+        setStats(transformed.stats);
+        setActiveSession(transformed.activeSession);
+      } catch (error) {
+        console.error('Failed to fetch dashboard:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDashboard();
+  }, []);
 
   const statCards = [
     { title: 'Total Classes', value: stats.totalClasses, icon: BookOpen, color: 'bg-blue-500' },
