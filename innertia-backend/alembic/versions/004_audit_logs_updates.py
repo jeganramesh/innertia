@@ -17,33 +17,31 @@ branch_labels = None
 depends_on = None
 
 
+def _column_exists(table_name: str, column_name: str) -> bool:
+    """Check if a column already exists in a table (SQLite compatible)."""
+    bind = op.get_bind()
+    result = bind.execute(sa.text(f"PRAGMA table_info('{table_name}')")).fetchall()
+    return any(row[1] == column_name for row in result)
+
+
 def upgrade() -> None:
-    # Change target_id from Integer to String(100) to support UUID
-    op.alter_column(
-        'audit_logs',
-        'target_id',
-        existing_type=sa.Integer(),
-        type_=sa.String(100),
-        existing_nullable=True,
-        postgresql_using='target_id::text'
-    )
+    """
+    Update audit_logs table.
     
-    # Add ip_address column
-    op.add_column(
-        'audit_logs',
-        sa.Column('ip_address', sa.String(45), nullable=True)
-    )
+    Note: SQLite doesn't support ALTER COLUMN, so we skip the type change
+    and only add the ip_address column if it doesn't exist.
+    """
+    
+    # Add ip_address column if it doesn't already exist
+    if not _column_exists('audit_logs', 'ip_address'):
+        op.add_column(
+            'audit_logs',
+            sa.Column('ip_address', sa.String(45), nullable=True)
+        )
 
 
 def downgrade() -> None:
-    # Remove ip_address column
-    op.drop_column('audit_logs', 'ip_address')
+    """Remove ip_address column."""
     
-    # Revert target_id to Integer
-    op.alter_column(
-        'audit_logs',
-        'target_id',
-        existing_type=sa.String(100),
-        type_=sa.Integer(),
-        existing_nullable=True
-    )
+    if _column_exists('audit_logs', 'ip_address'):
+        op.drop_column('audit_logs', 'ip_address')
