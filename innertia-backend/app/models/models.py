@@ -56,12 +56,11 @@ class User(Base):
     # Core fields
     full_name = Column(String(120), nullable=True)  # Backward compat with 'name'
     email = Column(String(150), unique=True, nullable=False, index=True)
-    hashed_password = Column(String(255), nullable=False)
+    password_hash = Column(String(255), nullable=False)
     role = Column(SQLEnum(RoleEnum), nullable=False, default=RoleEnum.STUDENT, index=True)
     
-    # Legacy fields for backward compatibility
+    # Legacy field for backward compatibility
     name = Column(String(255), nullable=True)  # Kept for backward compat
-    password_hash = Column(String(255), nullable=True)  # Legacy field
     
     # Status fields
     is_active = Column(Boolean, default=True, nullable=False, index=True)

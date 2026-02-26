@@ -18,10 +18,13 @@ depends_on = None
 
 
 def _column_exists(table_name: str, column_name: str) -> bool:
-    """Check if a column already exists in a table (SQLite compatible)."""
+    """Check if a column already exists in a table (PostgreSQL compatible)."""
     bind = op.get_bind()
-    result = bind.execute(sa.text(f"PRAGMA table_info('{table_name}')")).fetchall()
-    return any(row[1] == column_name for row in result)
+    result = bind.execute(
+        sa.text("SELECT column_name FROM information_schema.columns WHERE table_name = :table_name AND column_name = :column_name"),
+        {"table_name": table_name, "column_name": column_name}
+    ).fetchone()
+    return result is not None
 
 
 def upgrade() -> None:

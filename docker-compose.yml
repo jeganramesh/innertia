@@ -1,4 +1,23 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: innertia_postgres
+    environment:
+      POSTGRES_DB: innertia
+      POSTGRES_USER: innertia_user
+      POSTGRES_PASSWORD: innertia_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U innertia_user -d innertia"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - innertia_network
+
   redis:
     image: redis:7-alpine
     container_name: innertia_redis
@@ -22,6 +41,8 @@ services:
     ports:
       - "8000:8000"
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
     env_file:
@@ -29,7 +50,6 @@ services:
     volumes:
       - ./innertia-backend:/app
       - /app/__pycache__
-      - sqlite_data:/app/data
     command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     networks:
       - innertia_network
@@ -64,6 +84,7 @@ services:
     container_name: innertia_celery
     command: celery -A app.celery_worker worker --loglevel=info
     depends_on:
+      - postgres
       - redis
       - backend
     env_file:
@@ -71,14 +92,13 @@ services:
     volumes:
       - ./innertia-backend:/app
       - /app/__pycache__
-      - sqlite_data:/app/data
     networks:
       - innertia_network
     environment:
       - PYTHONPATH=/app
 
 volumes:
-  sqlite_data:
+  postgres_data:
   redis_data:
 
 networks:
