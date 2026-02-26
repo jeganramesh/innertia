@@ -13,7 +13,8 @@ import {
   ChevronRight,
   Bell,
   Shield,
-  Upload
+  Upload,
+  FileText
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -136,6 +137,7 @@ export const AdminSidebar = memo(({ className, onCollapseChange }: AdminSidebarP
     { icon: <BookOpen size={20} />, label: 'Classes', path: '/admin/classes' },
     { icon: <Activity size={20} />, label: 'Sessions', path: '/admin/sessions' },
     { icon: <BarChart3 size={20} />, label: 'Analytics', path: '/admin/analytics' },
+    { icon: <FileText size={20} />, label: 'Audit Logs', path: '/admin/audit-logs' },
     { icon: <Shield size={20} />, label: 'Settings', path: '/admin/settings' },
   ];
 
@@ -163,7 +165,7 @@ export const AdminSidebar = memo(({ className, onCollapseChange }: AdminSidebarP
       <aside
         className={twMerge(
           clsx(
-            'left-0 top-0 z-50 h-screen bg-white transition-all duration-300 ease-out',
+            'fixed left-0 top-0 z-50 h-screen bg-white transition-all duration-300 ease-out',
             'flex flex-col',
             isCollapsed ? 'w-[72px]' : 'w-[272px]',
             isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',

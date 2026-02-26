@@ -144,7 +144,7 @@ def upgrade() -> None:
             sa.Column('action', sa.String(length=50), nullable=False),
             sa.Column('performed_by', sa.UUID(), nullable=False),
             sa.Column('target_type', sa.String(length=50), nullable=True),
-            sa.Column('target_id', sa.Integer(), nullable=True),
+            sa.Column('target_id', sa.String(length=100), nullable=True),
             sa.Column('metadata_json', sa.Text(), nullable=True),
             sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
             sa.ForeignKeyConstraint(['performed_by'], ['users.id'], ondelete='CASCADE'),

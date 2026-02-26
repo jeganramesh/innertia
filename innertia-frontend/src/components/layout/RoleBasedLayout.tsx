@@ -1,8 +1,10 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useEffect, useCallback } from 'react';
 import { AdminSidebar } from './AdminSidebar';
 import { FacultySidebar } from './FacultySidebar';
 import { StudentSidebar } from './StudentSidebar';
 import { Header } from './Header';
+import { clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 
 interface RoleLayoutProps {
   children: ReactNode;
@@ -24,13 +26,20 @@ export const RoleBasedLayout = ({ children, role }: RoleLayoutProps) => {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex min-h-screen bg-[#f5f5f7]">
       {getSidebar()}
       
-      <div className="flex-1 flex flex-col w-full">
+      <div 
+        className={twMerge(
+          clsx(
+            'flex-1 flex flex-col transition-all duration-300 ease-out',
+            isSidebarCollapsed ? 'lg:ml-[72px]' : 'lg:ml-[272px]'
+          )
+        )}
+      >
         <Header />
         
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-4 lg:p-8">
           {children}
         </main>
       </div>

@@ -4,9 +4,8 @@
  */
 
 import { useState, useRef } from 'react';
-import { Upload, FileSpreadsheet, Download, CheckCircle, XCircle, AlertCircle, X } from 'lucide-react';
+import { Upload, FileSpreadsheet, Download, CheckCircle, XCircle, AlertCircle, X, Loader2 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
-import { Card } from '../../components/ui/Card';
 import { adminApiService, BulkUploadResponse } from '../../services/adminApi';
 
 export const UserBulkUpload = () => {
@@ -21,11 +20,6 @@ export const UserBulkUpload = () => {
   const handleFileSelect = (selectedFile: File | null) => {
     if (!selectedFile) return;
 
-    const allowedTypes = [
-      'text/csv',
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    ];
     const allowedExtensions = ['csv', 'xlsx', 'xls'];
     const fileExtension = selectedFile.name.split('.').pop()?.toLowerCase();
 
@@ -102,7 +96,7 @@ export const UserBulkUpload = () => {
 
   // Download template
   const handleDownloadTemplate = () => {
-    const csvContent = 'full_name,email,role,is_active\nJohn Doe,john.doe@example.com,student,true\nJane Smith,jane.smith@example.com,faculty,true\nAdmin User,admin@example.com,admin,true';
+    const csvContent = 'full_name,email,role,password,is_active\nJohn Doe,john.doe@example.com,student,changeme123,true\nJane Smith,jane.smith@example.com,faculty,changeme123,true\nAdmin User,admin@example.com,admin,changeme123,true';
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -113,37 +107,39 @@ export const UserBulkUpload = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 lg:space-y-8">
+      {/* Page Header - Apple Style */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Bulk User Upload</h1>
-          <p className="text-slate-500 mt-1">
-            Upload a CSV or Excel file to create or update multiple users at once
+          <h1 className="text-3xl lg:text-4xl font-semibold text-[#1d1d1f] tracking-tight">
+            Bulk User Upload
+          </h1>
+          <p className="text-base text-[#86868b] mt-2 max-w-xl">
+            Upload a CSV or Excel file to create or update multiple users at once.
           </p>
         </div>
         <Button
           variant="outline"
           onClick={handleDownloadTemplate}
-          className="inline-flex items-center gap-2"
+          className="h-11 px-5 rounded-xl flex items-center gap-2"
         >
           <Download className="w-4 h-4" />
           Download Template
         </Button>
       </div>
 
-      {/* Upload Card */}
-      <Card className="p-6">
-        <h2 className="text-lg font-semibold mb-4">Upload File</h2>
+      {/* Upload Section - Apple Style */}
+      <div className="bg-white rounded-2xl p-6 lg:p-8">
+        <h2 className="text-lg font-semibold text-[#1d1d1f] mb-6">Upload File</h2>
         
         {/* Drop Zone */}
         <div
-          className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+          className={`border-2 border-dashed rounded-2xl p-8 lg:p-12 text-center transition-all duration-300 ${
             isDragging
-              ? 'border-blue-500 bg-blue-50'
+              ? 'border-[#0071e3] bg-[#0071e3]/5'
               : file
-              ? 'border-green-500 bg-green-50'
-              : 'border-slate-300 hover:border-slate-400'
+              ? 'border-green-500 bg-green-50/50'
+              : 'border-[#d2d2d7] hover:border-[#0071e3] bg-[#f5f5f7]/50'
           }`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -151,14 +147,14 @@ export const UserBulkUpload = () => {
         >
           {file ? (
             <div className="flex flex-col items-center">
-              <FileSpreadsheet className="w-12 h-12 text-green-600 mb-3" />
-              <p className="font-medium text-slate-900">{file.name}</p>
-              <p className="text-sm text-slate-500">
+              <FileSpreadsheet className="w-14 h-14 text-green-600 mb-4" />
+              <p className="font-medium text-[#1d1d1f] text-lg">{file.name}</p>
+              <p className="text-sm text-[#86868b] mt-1">
                 {(file.size / 1024).toFixed(2)} KB
               </p>
               <button
                 onClick={handleClear}
-                className="mt-3 text-sm text-red-600 hover:text-red-700 inline-flex items-center gap-1"
+                className="mt-4 text-sm text-red-600 hover:text-red-700 inline-flex items-center gap-1"
               >
                 <X className="w-4 h-4" />
                 Remove file
@@ -166,17 +162,17 @@ export const UserBulkUpload = () => {
             </div>
           ) : (
             <div className="flex flex-col items-center">
-              <Upload className="w-12 h-12 text-slate-400 mb-3" />
-              <p className="text-slate-600 mb-1">
+              <Upload className="w-14 h-14 text-[#86868b] mb-4" />
+              <p className="text-[#1d1d1f] mb-2">
                 Drag and drop your file here, or{' '}
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="text-blue-600 hover:underline"
+                  className="text-[#0071e3] hover:underline font-medium"
                 >
                   browse
                 </button>
               </p>
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-[#86868b]">
                 Supports CSV, XLSX, XLS (max 5MB)
               </p>
             </div>
@@ -193,7 +189,7 @@ export const UserBulkUpload = () => {
 
         {/* Error Message */}
         {error && (
-          <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+          <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
             <div>
               <p className="font-medium text-red-800">Upload Error</p>
@@ -207,11 +203,11 @@ export const UserBulkUpload = () => {
           <Button
             onClick={handleUpload}
             disabled={!file || isUploading}
-            className="inline-flex items-center gap-2"
+            className="h-12 px-8 rounded-xl flex items-center gap-2"
           >
             {isUploading ? (
               <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin" />
                 Uploading...
               </>
             ) : (
@@ -222,28 +218,28 @@ export const UserBulkUpload = () => {
             )}
           </Button>
         </div>
-      </Card>
+      </div>
 
-      {/* Results Card */}
+      {/* Results Section */}
       {result && (
-        <Card className="p-6">
-          <h2 className="text-lg font-semibold mb-4">Upload Results</h2>
+        <div className="bg-white rounded-2xl p-6 lg:p-8">
+          <h2 className="text-lg font-semibold text-[#1d1d1f] mb-6">Upload Results</h2>
           
           {/* Summary */}
           <div className="grid grid-cols-3 gap-4 mb-6">
-            <div className="bg-green-50 rounded-lg p-4 text-center">
+            <div className="bg-green-50 rounded-2xl p-5 text-center">
               <CheckCircle className="w-8 h-8 text-green-600 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-green-700">{result.created_count}</p>
+              <p className="text-3xl font-semibold text-green-700">{result.created_count}</p>
               <p className="text-sm text-green-600">Created</p>
             </div>
-            <div className="bg-blue-50 rounded-lg p-4 text-center">
+            <div className="bg-blue-50 rounded-2xl p-5 text-center">
               <CheckCircle className="w-8 h-8 text-blue-600 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-blue-700">{result.updated_count}</p>
+              <p className="text-3xl font-semibold text-blue-700">{result.updated_count}</p>
               <p className="text-sm text-blue-600">Updated</p>
             </div>
-            <div className="bg-red-50 rounded-lg p-4 text-center">
+            <div className="bg-red-50 rounded-2xl p-5 text-center">
               <XCircle className="w-8 h-8 text-red-600 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-red-700">{result.failed_rows.length}</p>
+              <p className="text-3xl font-semibold text-red-700">{result.failed_rows.length}</p>
               <p className="text-sm text-red-600">Failed</p>
             </div>
           </div>
@@ -251,22 +247,22 @@ export const UserBulkUpload = () => {
           {/* Failed Rows Table */}
           {result.failed_rows.length > 0 && (
             <div>
-              <h3 className="font-medium text-slate-900 mb-3">Failed Rows</h3>
+              <h3 className="font-medium text-[#1d1d1f] mb-3">Failed Rows</h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-200">
-                      <th className="text-left py-2 px-3 font-medium text-slate-600">Row</th>
-                      <th className="text-left py-2 px-3 font-medium text-slate-600">Email</th>
-                      <th className="text-left py-2 px-3 font-medium text-slate-600">Error</th>
+                    <tr className="border-b border-[#d2d2d7]">
+                      <th className="text-left py-3 px-4 font-medium text-[#86868b]">Row</th>
+                      <th className="text-left py-3 px-4 font-medium text-[#86868b]">Email</th>
+                      <th className="text-left py-3 px-4 font-medium text-[#86868b]">Error</th>
                     </tr>
                   </thead>
                   <tbody>
                     {result.failed_rows.map((row, index) => (
-                      <tr key={index} className="border-b border-slate-100">
-                        <td className="py-2 px-3 text-slate-900">{row.row}</td>
-                        <td className="py-2 px-3 text-slate-600">{row.email || '-'}</td>
-                        <td className="py-2 px-3 text-red-600">{row.error}</td>
+                      <tr key={index} className="border-b border-[#f5f5f7]">
+                        <td className="py-3 px-4 text-[#1d1d1f]">{row.row}</td>
+                        <td className="py-3 px-4 text-[#86868b]">{row.email || '-'}</td>
+                        <td className="py-3 px-4 text-red-600">{row.error}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -277,32 +273,32 @@ export const UserBulkUpload = () => {
 
           {/* Success Message */}
           {result.failed_rows.length === 0 && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3">
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
               <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
               <p className="text-green-800">
                 All {result.created_count + result.updated_count} users were processed successfully!
               </p>
             </div>
           )}
-        </Card>
+        </div>
       )}
 
-      {/* Instructions Card */}
-      <Card className="p-6">
-        <h2 className="text-lg font-semibold mb-4">File Format Instructions</h2>
-        <div className="prose prose-sm max-w-none text-slate-600">
-          <p className="mb-3">Your file must contain the following columns:</p>
-          <ul className="list-disc pl-5 space-y-1">
+      {/* Instructions - Apple Style */}
+      <div className="bg-white rounded-2xl p-6 lg:p-8">
+        <h2 className="text-lg font-semibold text-[#1d1d1f] mb-4">File Format Instructions</h2>
+        <div className="text-[#86868b] space-y-3">
+          <p className="">Your file must contain the following columns:</p>
+          <ul className="list-disc pl-5 space-y-2">
             <li><strong>full_name</strong> - User's full name</li>
             <li><strong>email</strong> - User's email address (must be unique)</li>
-            <li><strong>role</strong> - User role: <code>student</code>, <code>faculty</code>, or <code>admin</code></li>
-            <li><strong>is_active</strong> - Account status: <code>true</code> or <code>false</code></li>
+            <li><strong>role</strong> - User role: <code className="bg-[#f5f5f7] px-2 py-0.5 rounded">student</code>, <code className="bg-[#f5f5f7] px-2 py-0.5 rounded">faculty</code>, or <code className="bg-[#f5f5f7] px-2 py-0.5 rounded">admin</code></li>
+            <li><strong>is_active</strong> - Account status: <code className="bg-[#f5f5f7] px-2 py-0.5 rounded">true</code> or <code className="bg-[#f5f5f7] px-2 py-0.5 rounded">false</code></li>
           </ul>
-          <p className="mt-3">
+          <p className="mt-4 text-[#1d1d1f]">
             <strong>Note:</strong> If a user with the same email already exists, their information will be updated instead of creating a new user.
           </p>
         </div>
-      </Card>
+      </div>
     </div>
   );
 };

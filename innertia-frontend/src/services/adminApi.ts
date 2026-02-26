@@ -83,6 +83,8 @@ export interface DashboardStats {
     faculty: number;
     student: number;
   };
+  average_attendance_rate: number;
+  total_violations_7_days: number;
 }
 
 export interface SessionMonitorOut {
@@ -101,6 +103,46 @@ export interface SessionMonitorOut {
 
 export interface SessionListResponse {
   sessions: SessionMonitorOut[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface AttendanceAnalyticsResponse {
+  date: string;
+  attendance_rate: number;
+  session_count: number;
+  violation_count: number;
+}
+
+export interface AttendanceAnalyticsSummary {
+  daily_data: AttendanceAnalyticsResponse[];
+  average_attendance_rate: number;
+  total_sessions: number;
+  total_violations: number;
+  date_range_start: string;
+  date_range_end: string;
+}
+
+export interface SystemSettings {
+  attendance_threshold: number;
+  max_focus_violations: number;
+  session_timeout_minutes: number;
+}
+
+export interface AuditLogResponse {
+  id: string;
+  action: string;
+  performed_by: string;
+  target_type?: string;
+  target_id?: number;
+  metadata_json?: string;
+  created_at: string;
+  ip_address?: string;
+}
+
+export interface AuditLogListResponse {
+  logs: AuditLogResponse[];
   total: number;
   page: number;
   page_size: number;
@@ -295,6 +337,55 @@ export const adminApiService = {
    */
   async toggleUser(userId: string): Promise<UserOutAdmin> {
     const response = await adminApi.patch<UserOutAdmin>(`/admin/users/${userId}/toggle`);
+    return response.data;
+  },
+
+  // ============ Analytics ============
+
+  /**
+   * Get attendance analytics
+   */
+  async getAttendanceAnalytics(params?: {
+    start_date?: string;
+    end_date?: string;
+    department?: string;
+  }): Promise<AttendanceAnalyticsSummary> {
+    const response = await adminApi.get<AttendanceAnalyticsSummary>('/admin/analytics/attendance', { params });
+    return response.data;
+  },
+
+  // ============ Settings ============
+
+  /**
+   * Get system settings
+   */
+  async getSettings(): Promise<SystemSettings> {
+    const response = await adminApi.get<SystemSettings>('/admin/settings');
+    return response.data;
+  },
+
+  /**
+   * Update system settings
+   */
+  async updateSettings(data: Partial<SystemSettings>): Promise<SystemSettings> {
+    const response = await adminApi.patch<SystemSettings>('/admin/settings', data);
+    return response.data;
+  },
+
+  // ============ Audit Logs ============
+
+  /**
+   * Get audit logs
+   */
+  async getAuditLogs(params?: {
+    page?: number;
+    page_size?: number;
+    action_type?: string;
+    start_date?: string;
+    end_date?: string;
+    user_id?: string;
+  }): Promise<AuditLogListResponse> {
+    const response = await adminApi.get<AuditLogListResponse>('/admin/audit-logs', { params });
     return response.data;
   }
 };

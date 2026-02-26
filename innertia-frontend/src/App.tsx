@@ -13,6 +13,7 @@ import {
   AdminSessionsPage, 
   AdminAnalyticsPage, 
   AdminSettingsPage,
+  AuditLogsPage,
   UserBulkUpload
 } from './pages/admin';
 
@@ -93,6 +94,7 @@ const AdminRoutes = () => {
         <Route path="sessions" element={<AdminSessionsPage />} />
         <Route path="analytics" element={<AdminAnalyticsPage />} />
         <Route path="settings" element={<AdminSettingsPage />} />
+        <Route path="audit-logs" element={<AuditLogsPage />} />
       </Routes>
     </AdminLayout>
   );

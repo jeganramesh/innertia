@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Card } from '../../components/ui/Card';
 import { 
   Users, 
   GraduationCap, 
@@ -12,7 +11,6 @@ import {
 } from 'lucide-react';
 import { adminApiService, DashboardStats } from '../../services/adminApi';
 
-// Transform API response to component format
 const transformStats = (apiStats: DashboardStats) => ({
   totalUsers: apiStats.total_users,
   totalFaculties: apiStats.total_faculty,
@@ -21,25 +19,9 @@ const transformStats = (apiStats: DashboardStats) => ({
   totalClasses: apiStats.total_classes,
   totalSessions: apiStats.total_sessions,
   last30DaySessions: apiStats.last_30_day_sessions,
-  averageAttendance: 0, // Would need separate calculation
-  violationCount: 0 // Would need separate endpoint
+  averageAttendance: apiStats.average_attendance_rate || 0,
+  violationCount: apiStats.total_violations_7_days || 0
 });
-
-const recentActivity = [
-  { id: 1, action: 'User Created', user: 'john.doe@edu.com', role: 'student', time: '2 min ago' },
-  { id: 2, action: 'Session Started', class: 'CS101 - Introduction to Programming', faculty: 'Dr. Smith', time: '5 min ago' },
-  { id: 3, action: 'Class Archived', class: 'ENG201 - Advanced Writing', admin: 'Admin User', time: '1 hour ago' },
-  { id: 4, action: 'Violation Detected', class: 'MATH301', student: 'Jane Doe', time: '15 min ago' },
-  { id: 5, action: 'Faculty Added', user: 'prof.johnson@edu.com', role: 'faculty', time: '3 hours ago' },
-];
-
-const attendanceTrend = [
-  { day: 'Mon', rate: 85 },
-  { day: 'Tue', rate: 88 },
-  { day: 'Wed', rate: 82 },
-  { day: 'Thu', rate: 91 },
-  { day: 'Fri', rate: 87 },
-];
 
 export const AdminDashboard = () => {
   const [stats, setStats] = useState(transformStats({
@@ -51,7 +33,9 @@ export const AdminDashboard = () => {
     total_sessions: 0,
     active_sessions: 0,
     last_30_day_sessions: 0,
-    users_by_role: { admin: 0, faculty: 0, student: 0 }
+    users_by_role: { admin: 0, faculty: 0, student: 0 },
+    average_attendance_rate: 0,
+    total_violations_7_days: 0
   }));
   const [isLoading, setIsLoading] = useState(true);
 
@@ -75,44 +59,40 @@ export const AdminDashboard = () => {
     { 
       title: 'Total Users', 
       value: stats.totalUsers, 
-      icon: Users, 
-      color: 'bg-blue-500',
-      change: '+12%'
+      icon: Users
     },
     { 
-      title: 'Faculties', 
+      title: 'Total Faculty', 
       value: stats.totalFaculties, 
-      icon: GraduationCap, 
-      color: 'bg-purple-500',
-      change: '+3%'
+      icon: GraduationCap
     },
     { 
-      title: 'Students', 
+      title: 'Total Students', 
       value: stats.totalStudents, 
-      icon: BookOpen, 
-      color: 'bg-green-500',
-      change: '+15%'
+      icon: BookOpen
     },
     { 
       title: 'Active Sessions', 
       value: stats.activeSessions, 
-      icon: Activity, 
-      color: 'bg-orange-500',
-      change: 'Live'
+      icon: Activity
     },
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-8 lg:space-y-12">
+      {/* Page Header - Apple Style */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-          <p className="text-gray-500 mt-1">System overview and management</p>
+          <h1 className="text-3xl lg:text-4xl font-semibold text-[#1d1d1f] tracking-tight">
+            Institution Overview
+          </h1>
+          <p className="text-base text-[#86868b] mt-2 max-w-xl">
+            Monitor your institution's performance, track attendance metrics, and manage users across all departments.
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Clock className="w-5 h-5 text-gray-400" />
-          <span className="text-sm text-gray-500">
+        <div className="flex items-center gap-2 text-sm text-[#86868b]">
+          <Clock className="w-4 h-4" />
+          <span>
             {new Date().toLocaleDateString('en-US', { 
               weekday: 'long', 
               year: 'numeric', 
@@ -123,96 +103,83 @@ export const AdminDashboard = () => {
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Primary Metrics Grid - Apple Style */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-6">
         {statCards.map((stat, index) => (
-          <Card key={index} className="p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">{stat.title}</p>
-                <p className="text-2xl font-bold mt-1">{stat.value.toLocaleString()}</p>
-                <span className="text-xs text-green-600 mt-2 inline-flex items-center gap-1">
-                  <TrendingUp className="w-3 h-3" />
-                  {stat.change}
-                </span>
+          <div 
+            key={index}
+            className="group bg-white rounded-2xl p-6 lg:p-8 transition-all duration-300 ease-out hover:scale-[1.02] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] cursor-default"
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <p className="text-[13px] font-medium text-[#86868b] uppercase tracking-[0.5px]">
+                  {stat.title}
+                </p>
+                <p className="text-5xl lg:text-6xl font-semibold text-[#1d1d1f] mt-3 tracking-tight">
+                  {isLoading ? '-' : stat.value.toLocaleString()}
+                </p>
               </div>
-              <div className={`p-3 rounded-lg ${stat.color}`}>
-                <stat.icon className="w-6 h-6 text-white" />
+              <div className="w-12 h-12 rounded-xl bg-[#f5f5f7] flex items-center justify-center group-hover:bg-[#0071e3] group-hover:text-white transition-all duration-300">
+                <stat.icon className="w-6 h-6" />
               </div>
             </div>
-          </Card>
+          </div>
         ))}
       </div>
 
-      {/* Secondary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="p-5">
+      {/* Secondary Metrics - Apple Style */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
+        <div className="bg-white rounded-2xl p-6 lg:p-8 transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)]">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-900">Total Classes</h3>
-            <BookOpen className="w-5 h-5 text-gray-400" />
+            <h3 className="text-[13px] font-medium text-[#86868b] uppercase tracking-[0.5px]">Total Classes</h3>
+            <BookOpen className="w-5 h-5 text-[#86868b]" />
           </div>
-          <p className="text-3xl font-bold">{stats.totalClasses}</p>
-          <p className="text-sm text-gray-500 mt-1">Across all faculties</p>
-        </Card>
+          <p className="text-4xl font-semibold text-[#1d1d1f]">{isLoading ? '-' : stats.totalClasses}</p>
+          <p className="text-sm text-[#86868b] mt-2">Across all faculties</p>
+        </div>
 
-        <Card className="p-5">
+        <div className="bg-white rounded-2xl p-6 lg:p-8 transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)]">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-900">Average Attendance</h3>
-            <BarChart3 className="w-5 h-5 text-gray-400" />
+            <h3 className="text-[13px] font-medium text-[#86868b] uppercase tracking-[0.5px]">Average Attendance</h3>
+            <BarChart3 className="w-5 h-5 text-[#86868b]" />
           </div>
-          <p className="text-3xl font-bold">{stats.averageAttendance}%</p>
-          <p className="text-sm text-gray-500 mt-1">This week</p>
-        </Card>
+          <p className="text-4xl font-semibold text-[#1d1d1f]">{isLoading ? '-' : `${stats.averageAttendance}%`}</p>
+          <p className="text-sm text-[#86868b] mt-2">Last 7 days</p>
+        </div>
 
-        <Card className="p-5">
+        <div className="bg-white rounded-2xl p-6 lg:p-8 transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)]">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-900">Violations</h3>
-            <AlertTriangle className="w-5 h-5 text-red-500" />
+            <h3 className="text-[13px] font-medium text-[#86868b] uppercase tracking-[0.5px]">Violations</h3>
+            <AlertTriangle className="w-5 h-5 text-[#86868b]" />
           </div>
-          <p className="text-3xl font-bold text-red-600">{stats.violationCount}</p>
-          <p className="text-sm text-gray-500 mt-1">This week</p>
-        </Card>
+          <p className="text-4xl font-semibold text-[#1d1d1f]">{isLoading ? '-' : stats.violationCount}</p>
+          <p className="text-sm text-[#86868b] mt-2">Last 7 days</p>
+        </div>
       </div>
 
-      {/* Charts and Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Attendance Trend */}
-        <Card className="p-5">
-          <h3 className="font-semibold text-gray-900 mb-4">Attendance Trend</h3>
-          <div className="flex items-end justify-between h-40">
-            {attendanceTrend.map((day, index) => (
-              <div key={index} className="flex flex-col items-center flex-1">
-                <div 
-                  className="w-full bg-blue-500 rounded-t transition-all duration-300"
-                  style={{ height: `${day.rate}%` }}
-                />
-                <span className="text-xs text-gray-500 mt-2">{day.day}</span>
-                <span className="text-xs font-medium">{day.rate}%</span>
-              </div>
-            ))}
+      {/* Quick Stats Row */}
+      <div className="bg-[#f5f5f7] rounded-2xl p-6 lg:p-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div>
+            <p className="text-[13px] font-medium text-[#86868b] uppercase tracking-[0.5px]">Total Sessions</p>
+            <p className="text-2xl font-semibold text-[#1d1d1f] mt-1">{isLoading ? '-' : stats.totalSessions}</p>
           </div>
-        </Card>
-
-        {/* Recent Activity */}
-        <Card className="p-5">
-          <h3 className="font-semibold text-gray-900 mb-4">Recent Activity</h3>
-          <div className="space-y-4">
-            {recentActivity.map((activity) => (
-              <div key={activity.id} className="flex items-start gap-3 pb-3 border-b border-gray-100 last:border-0">
-                <div className="w-2 h-2 mt-2 rounded-full bg-blue-500" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">{activity.action}</p>
-                  <p className="text-xs text-gray-500">
-                    {activity.user && `${activity.user} (${activity.role})`}
-                    {activity.class && `${activity.class} - ${activity.faculty || activity.admin}`}
-                    {activity.student && `Student: ${activity.student}`}
-                  </p>
-                </div>
-                <span className="text-xs text-gray-400">{activity.time}</span>
-              </div>
-            ))}
+          <div>
+            <p className="text-[13px] font-medium text-[#86868b] uppercase tracking-[0.5px]">Sessions (30d)</p>
+            <p className="text-2xl font-semibold text-[#1d1d1f] mt-1">{isLoading ? '-' : stats.last30DaySessions}</p>
           </div>
-        </Card>
+          <div>
+            <p className="text-[13px] font-medium text-[#86868b] uppercase tracking-[0.5px]">Total Admins</p>
+            <p className="text-2xl font-semibold text-[#1d1d1f] mt-1">{isLoading ? '-' : (stats.totalUsers - stats.totalFaculties - stats.totalStudents)}</p>
+          </div>
+          <div>
+            <p className="text-[13px] font-medium text-[#86868b] uppercase tracking-[0.5px]">System Status</p>
+            <p className="text-2xl font-semibold text-green-600 mt-1 flex items-center gap-2">
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+              Active
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

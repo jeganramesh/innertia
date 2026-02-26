@@ -14,52 +14,11 @@ import {
   Loader2,
   AlertCircle,
   ChevronLeft,
-  ChevronRight,
-  X
+  ChevronRight
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../../components/ui/Dialog';
 import { adminApiService, UserOutAdmin, UserCreateAdmin, UserUpdateAdmin } from '../../services/adminApi';
 import { useAuth } from '../../hooks/useAuth';
-
-// Mock data for fallback
-const mockUsers: UserOutAdmin[] = [
-  {
-    id: '1',
-    email: 'admin@innertia.com',
-    name: 'System Admin',
-    role: 'admin',
-    is_active: true,
-    created_at: '2024-01-01T00:00:00Z',
-    updated_at: '2024-01-01T00:00:00Z'
-  },
-  {
-    id: '2',
-    email: 'prof.johnson@innertia.com',
-    name: 'Dr. Sarah Johnson',
-    role: 'faculty',
-    is_active: true,
-    created_at: '2024-01-15T00:00:00Z',
-    updated_at: '2024-01-15T00:00:00Z'
-  },
-  {
-    id: '3',
-    email: 'jane.doe@student.innertia.com',
-    name: 'Jane Doe',
-    role: 'student',
-    is_active: true,
-    created_at: '2024-02-01T00:00:00Z',
-    updated_at: '2024-02-01T00:00:00Z'
-  },
-  {
-    id: '4',
-    email: 'mark.smith@student.innertia.com',
-    name: 'Mark Smith',
-    role: 'student',
-    is_active: false,
-    created_at: '2024-02-05T00:00:00Z',
-    updated_at: '2024-02-10T00:00:00Z'
-  }
-];
 
 // Types
 interface UserFormData {
@@ -88,7 +47,6 @@ export const UsersPage = () => {
   const [pageSize] = useState(10);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [useMockData, setUseMockData] = useState(false);
   
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -112,7 +70,7 @@ export const UsersPage = () => {
     return () => clearTimeout(timer);
   }, [searchTerm]);
   
-  // Fetch users - with fallback to mock data
+  // Fetch users - using real API only
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
@@ -125,43 +83,14 @@ export const UsersPage = () => {
         search: debouncedSearch || undefined,
       };
       
-      console.log('Fetching users with params:', params);
       const response = await adminApiService.listUsers(params);
-      console.log('Users fetched successfully:', response);
       setUsers(response.users);
       setTotal(response.total);
-      setUseMockData(false);
     } catch (err: any) {
-      console.error('API error fetching users:', {
-        message: err.message,
-        status: err.response?.status,
-        statusText: err.response?.statusText,
-        data: err.response?.data,
-        config: {
-          url: err.config?.url,
-          baseURL: err.config?.baseURL,
-          method: err.config?.method,
-        }
-      });
-      // Fall back to mock data with filtering
-      setUseMockData(true);
-      let filtered = [...mockUsers];
-      
-      if (roleFilter !== 'all') {
-        filtered = filtered.filter(u => u.role === roleFilter);
-      }
-      
-      if (debouncedSearch) {
-        const search = debouncedSearch.toLowerCase();
-        filtered = filtered.filter(u =>
-          u.email.toLowerCase().includes(search) ||
-          (u.name && u.name.toLowerCase().includes(search))
-        );
-      }
-      
-      setUsers(filtered);
-      setTotal(filtered.length);
-      setError(null);
+      console.error('Failed to fetch users:', err);
+      setError('Failed to load users. Please try again.');
+      setUsers([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
@@ -185,12 +114,27 @@ export const UsersPage = () => {
       setFormLoading(true);
       setFormError(null);
       
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email)) {
+        setFormError('Please enter a valid email address');
+        setFormLoading(false);
+        return;
+      }
+      
+      // Validate password
+      if (!formData.password || formData.password.length < 8) {
+        setFormError('Password must be at least 8 characters');
+        setFormLoading(false);
+        return;
+      }
+      
       const userData: UserCreateAdmin = {
         email: formData.email,
         name: formData.name || undefined,
         role: formData.role,
         is_active: formData.is_active,
-        password: formData.password || 'changeme123'
+        password: formData.password
       };
       
       await adminApiService.createUser(userData);
@@ -198,7 +142,14 @@ export const UsersPage = () => {
       setFormData(initialFormData);
       fetchUsers();
     } catch (err: any) {
-      setFormError(err.response?.data?.detail || 'Failed to create user');
+      const errorDetail = err.response?.data?.detail;
+      if (typeof errorDetail === 'string') {
+        setFormError(errorDetail);
+      } else if (Array.isArray(errorDetail)) {
+        setFormError(errorDetail.map((e: any) => e.msg || JSON.stringify(e)).join(', '));
+      } else {
+        setFormError('Failed to create user. Please try again.');
+      }
     } finally {
       setFormLoading(false);
     }
@@ -234,13 +185,14 @@ export const UsersPage = () => {
       await adminApiService.toggleUser(user.id);
       fetchUsers();
     } catch (err: any) {
-      // Mock toggle for demo
-      if (useMockData) {
-        setUsers(users.map(u => 
-          u.id === user.id ? { ...u, is_active: !u.is_active } : u
-        ));
+      const errorDetail = err.response?.data?.detail || 'Failed to toggle user status';
+      // Show more specific error messages
+      if (errorDetail.includes('Cannot disable your own account')) {
+        alert('You cannot disable your own account.');
+      } else if (errorDetail.includes('Cannot disable the last admin')) {
+        alert('Cannot disable the last admin account.');
       } else {
-        alert(err.response?.data?.detail || 'Failed to toggle user status');
+        alert(errorDetail);
       }
     }
   };
@@ -255,14 +207,7 @@ export const UsersPage = () => {
       setSelectedUser(null);
       fetchUsers();
     } catch (err: any) {
-      // Mock delete for demo
-      if (useMockData) {
-        setUsers(users.filter(u => u.id !== selectedUser.id));
-        setShowDeleteModal(false);
-        setSelectedUser(null);
-      } else {
-        setFormError(err.response?.data?.detail || 'Failed to delete user');
-      }
+      setFormError(err.response?.data?.detail || 'Failed to delete user');
     } finally {
       setFormLoading(false);
     }
@@ -293,7 +238,7 @@ export const UsersPage = () => {
       student: 'bg-blue-100 text-blue-700'
     };
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[role as keyof typeof colors]}`}>
+      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${colors[role as keyof typeof colors]}`}>
         {role.charAt(0).toUpperCase() + role.slice(1)}
       </span>
     );
@@ -310,24 +255,28 @@ export const UsersPage = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 lg:space-y-8">
+      {/* Page Header - Apple Style */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
-          <p className="text-gray-500 mt-1">Manage students, faculty, and admin accounts</p>
+          <h1 className="text-3xl lg:text-4xl font-semibold text-[#1d1d1f] tracking-tight">
+            User Management
+          </h1>
+          <p className="text-base text-[#86868b] mt-2 max-w-xl">
+            Manage students, faculty, and admin accounts across your institution.
+          </p>
         </div>
         <div className="flex gap-3">
           <Button 
             variant="outline" 
-            className="flex items-center gap-2"
+            className="h-11 px-5 rounded-xl flex items-center gap-2"
             onClick={() => window.location.href = '/admin/users/bulk-upload'}
           >
             <Upload className="w-4 h-4" />
             Bulk Upload
           </Button>
           <Button 
-            className="flex items-center gap-2" 
+            className="h-11 px-5 rounded-xl flex items-center gap-2" 
             onClick={() => {
               setFormData(initialFormData);
               setFormError(null);
@@ -340,17 +289,17 @@ export const UsersPage = () => {
         </div>
       </div>
 
-      {/* Filters */}
-      <Card className="p-4">
+      {/* Filters - Apple Style */}
+      <div className="bg-white rounded-2xl p-4 lg:p-5">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#86868b]" />
               <Input
                 placeholder="Search by name or email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-12 h-12 rounded-xl bg-[#f5f5f7] border-0 focus:bg-white"
               />
             </div>
           </div>
@@ -360,6 +309,7 @@ export const UsersPage = () => {
                 key={role}
                 variant={roleFilter === role ? 'primary' : 'outline'}
                 size="sm"
+                className="h-11 px-5 rounded-xl"
                 onClick={() => setRoleFilter(role)}
               >
                 {role.charAt(0).toUpperCase() + role.slice(1)}
@@ -367,30 +317,22 @@ export const UsersPage = () => {
             ))}
           </div>
         </div>
-      </Card>
+      </div>
 
-      {/* Mock Data Notice */}
-      {useMockData && !loading && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center gap-2 text-sm text-yellow-700">
-          <AlertCircle className="w-4 h-4" />
-          Showing demo data. Connect to API for real data.
-        </div>
-      )}
-
-      {/* Users Table */}
-      <Card className="overflow-hidden">
+      {/* Users Table - Apple Style */}
+      <div className="bg-white rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b">
+            <thead className="bg-[#f5f5f7]">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                <th className="px-6 py-4 text-left text-[13px] font-medium text-[#86868b] uppercase tracking-[0.5px]">User</th>
+                <th className="px-6 py-4 text-left text-[13px] font-medium text-[#86868b] uppercase tracking-[0.5px]">Role</th>
+                <th className="px-6 py-4 text-left text-[13px] font-medium text-[#86868b] uppercase tracking-[0.5px]">Status</th>
+                <th className="px-6 py-4 text-left text-[13px] font-medium text-[#86868b] uppercase tracking-[0.5px]">Created</th>
+                <th className="px-6 py-4 text-right text-[13px] font-medium text-[#86868b] uppercase tracking-[0.5px]">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y divide-[#f5f5f7]">
               {loading ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center">
@@ -417,15 +359,15 @@ export const UsersPage = () => {
                 </tr>
               ) : (
                 users.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
+                  <tr key={user.id} className="hover:bg-[#f5f5f7]/50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
-                          <UserCog className="w-5 h-5 text-gray-500" />
+                        <div className="w-10 h-10 rounded-full bg-[#f5f5f7] flex items-center justify-center">
+                          <UserCog className="w-5 h-5 text-[#86868b]" />
                         </div>
                         <div>
-                          <p className="font-medium text-gray-900">{user.name || 'N/A'}</p>
-                          <p className="text-sm text-gray-500">{user.email}</p>
+                          <p className="font-medium text-[#1d1d1f]">{user.name || 'N/A'}</p>
+                          <p className="text-sm text-[#86868b]">{user.email}</p>
                         </div>
                       </div>
                     </td>
@@ -447,7 +389,7 @@ export const UsersPage = () => {
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
+                    <td className="px-6 py-4 text-sm text-[#86868b]">
                       {new Date(user.created_at).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4">
@@ -528,7 +470,7 @@ export const UsersPage = () => {
             </div>
           </div>
         )}
-      </Card>
+      </div>
 
       {/* Create User Modal */}
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
@@ -582,7 +524,7 @@ export const UsersPage = () => {
                 type="password"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                placeholder="Leave blank for default password"
+                placeholder="Enter password (min 8 characters)"
               />
               <p className="text-xs text-gray-500">Default: "changeme123" if left blank</p>
             </div>

@@ -28,8 +28,8 @@ export const Header = ({
     <header
       className={twMerge(
         clsx(
-          'sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-gray-200',
-          'h-16 flex items-center justify-between px-6',
+          'sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-[#d2d2d7]',
+          'h-14 lg:h-16 flex items-center justify-between px-4 lg:px-6',
           className
         )
       )}

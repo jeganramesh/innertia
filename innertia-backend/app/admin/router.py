@@ -48,8 +48,9 @@ async def create_user(
 ):
     """
     Create a new user (admin only).
+    If a soft-deleted user exists with the same email, restore them instead.
     """
-    # Check if user already exists
+    # Check if user already exists (not deleted)
     result = await db.execute(
         select(User).where(
             and_(
@@ -64,6 +65,53 @@ async def create_user(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="User with this email already exists"
+        )
+    
+    # Check if there's a soft-deleted user with the same email
+    result = await db.execute(
+        select(User).where(
+            and_(
+                User.email == user_data.email,
+                User.deleted_at.isnot(None)
+            )
+        )
+    )
+    deleted_user = result.scalar_one_or_none()
+    
+    if deleted_user:
+        # Restore the soft-deleted user
+        deleted_user.deleted_at = None
+        deleted_user.is_active = user_data.is_active
+        deleted_user.role = user_data.role
+        deleted_user.full_name = user_data.name
+        deleted_user.password_hash = hash_password(user_data.password)
+        deleted_user.updated_at = datetime.utcnow()
+        
+        await db.commit()
+        await db.refresh(deleted_user)
+        
+        # Log the action
+        await log_admin_action(
+            db=db,
+            performed_by=current_user.id,
+            action="RESTORE_USER",
+            target_type="user",
+            target_id=str(deleted_user.id),
+            details={
+                "email": deleted_user.email,
+                "role": deleted_user.role.value if hasattr(deleted_user.role, 'value') else str(deleted_user.role)
+            },
+            ip_address=request.client.host if request.client else None
+        )
+        
+        return UserOutAdmin(
+            id=str(deleted_user.id),
+            email=deleted_user.email,
+            name=deleted_user.full_name,
+            role=deleted_user.role.value if hasattr(deleted_user.role, 'value') else str(deleted_user.role),
+            is_active=deleted_user.is_active,
+            created_at=deleted_user.created_at,
+            updated_at=deleted_user.updated_at
         )
     
     # Create new user
@@ -527,10 +575,11 @@ async def bulk_upload_users(
     Bulk upload users from CSV or Excel file (admin only).
     
     Expected columns:
-    - full_name: User's name
-    - email: User's email (unique)
-    - role: Role (student, faculty, admin)
-    - is_active: Boolean (true/false or 1/0)
+    - email: User's email (unique) - REQUIRED
+    - role: Role (student, faculty, admin) - REQUIRED
+    - full_name (or name): User's name - OPTIONAL
+    - password: User's password - OPTIONAL (will generate random if not provided)
+    - is_active: Boolean (true/false or 1/0) - OPTIONAL (default: true)
     """
     # Validate file type
     allowed_types = [
@@ -630,7 +679,15 @@ async def bulk_upload_users(
             elif "name" in row and pd.notna(row.get("name")):
                 full_name = str(row["name"]).strip()
             
-            # Check if user exists (soft deleted users can be re-activated)
+            # Get password - use provided password or generate random one
+            password = None
+            if "password" in row and pd.notna(row.get("password")) and str(row["password"]).strip():
+                password = str(row["password"]).strip()
+            else:
+                import secrets
+                password = secrets.token_urlsafe(8)
+            
+            hashed_password = hash_password(password)
             result = await db.execute(
                 select(User).where(User.email == email)
             )
@@ -643,6 +700,7 @@ async def bulk_upload_users(
                     existing_user.full_name = full_name or existing_user.full_name
                     existing_user.role = role
                     existing_user.is_active = is_active
+                    existing_user.password_hash = hashed_password
                     existing_user.updated_at = datetime.utcnow()
                     updated_count += 1
                 else:
@@ -650,17 +708,14 @@ async def bulk_upload_users(
                     existing_user.full_name = full_name or existing_user.full_name
                     existing_user.role = role
                     existing_user.is_active = is_active
+                    existing_user.password_hash = hashed_password
                     existing_user.updated_at = datetime.utcnow()
                     updated_count += 1
             else:
                 # Create new user
-                import secrets
-                default_password = secrets.token_urlsafe(8)
-                hashed_password = hash_password(default_password)
-                
                 new_user = User(
                     email=email,
-                    hashed_password=hashed_password,
+                    password_hash=hashed_password,
                     full_name=full_name,
                     role=role,
                     is_active=is_active
