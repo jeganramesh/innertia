@@ -7,10 +7,12 @@
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 
 // API Configuration
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 const API_V1_PREFIX = '/api/v1';
+const ACCOUNTS_PREFIX = '/accounts';  // Backend uses /accounts (plural)
 
 // Types
+
 export interface LoginInput {
   email: string;
   password: string;
@@ -42,11 +44,11 @@ export interface AuthResponse {
 // Create axios instance for account API
 const createApiClient = (): AxiosInstance => {
   const client = axios.create({
-    baseURL: `${API_BASE_URL}${API_V1_PREFIX}`,
+    baseURL: `${API_BASE_URL}${API_V1_PREFIX}${ACCOUNTS_PREFIX}`,
     headers: {
       'Content-Type': 'application/json',
     },
-    withCredentials: true,
+    withCredentials: false,  // Set to false when using wildcard CORS origins
   });
 
   // Request interceptor - add auth token
@@ -126,24 +128,21 @@ const TEST_CREDENTIALS = {
 export const authService = {
   /**
    * Login user with email and password
+   * Uses real backend API for authentication
    */
   async login(data: LoginInput): Promise<AuthResponse> {
-    // Development mode - check for test credentials
-    if (import.meta.env.DEV) {
-      if (data.email === TEST_CREDENTIALS.student.email && data.password === TEST_CREDENTIALS.student.password) {
-        return this.createMockResponse(TEST_CREDENTIALS.student);
-      }
-      if (data.email === TEST_CREDENTIALS.faculty.email && data.password === TEST_CREDENTIALS.faculty.password) {
-        return this.createMockResponse(TEST_CREDENTIALS.faculty);
-      }
-      if (data.email === TEST_CREDENTIALS.admin.email && data.password === TEST_CREDENTIALS.admin.password) {
-        return this.createMockResponse(TEST_CREDENTIALS.admin);
-      }
-    }
-
-    // Production - call real API
+    console.log('Login attempt:', { email: data.email, isDev: import.meta.env.DEV, mode: import.meta.env.MODE });
+    
+    // Check for test credentials - use REAL backend API for authentication
+    const isTestCredentials =
+      (data.email === TEST_CREDENTIALS.student.email && data.password === TEST_CREDENTIALS.student.password) ||
+      (data.email === TEST_CREDENTIALS.faculty.email && data.password === TEST_CREDENTIALS.faculty.password) ||
+      (data.email === TEST_CREDENTIALS.admin.email && data.password === TEST_CREDENTIALS.admin.password);
+    
+    // ALWAYS call real API for authentication (never use mock tokens)
+    // This ensures we get valid JWT tokens that the backend can validate
     try {
-      const response = await api.post<AuthTokens>('/account/login', data);
+      const response = await api.post<AuthTokens>('/login', data);
       const { access_token, refresh_token, token_type } = response.data;
 
       // Store tokens
@@ -152,15 +151,23 @@ export const authService = {
       localStorage.setItem('token_type', token_type);
 
       // Get user info
-      const userResponse = await api.get<User>('/account/me');
+      const userResponse = await api.get<User>('/me');
       const user = userResponse.data;
 
       return {
         user,
         tokens: { access_token, refresh_token, token_type }
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
+      // Provide more helpful error message
+      if (error.response?.status === 401) {
+        throw new Error('Invalid email or password');
+      } else if (error.response?.status === 403) {
+        throw new Error('Account is inactive or not verified');
+      } else if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+        throw new Error('Cannot connect to server. Please check if the backend is running.');
+      }
       throw error;
     }
   },
@@ -198,7 +205,7 @@ export const authService = {
    */
   async logout(): Promise<void> {
     try {
-      await api.post('/account/logout');
+      await api.post('/logout');
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
@@ -210,7 +217,7 @@ export const authService = {
    * Get current user from API
    */
   async getCurrentUser(): Promise<User> {
-    const response = await api.get<User>('/account/me');
+    const response = await api.get<User>('/me');
     return response.data;
   },
 
@@ -223,7 +230,7 @@ export const authService = {
       throw new Error('No refresh token available');
     }
 
-    const response = await api.post<AuthTokens>('/account/refresh', { refresh_token });
+    const response = await api.post<AuthTokens>('/refresh', { refresh_token });
     const { access_token, refresh_token: newRefreshToken, token_type } = response.data;
 
     // Store new tokens

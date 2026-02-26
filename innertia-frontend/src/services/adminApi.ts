@@ -113,7 +113,7 @@ const createAdminApiClient = (): AxiosInstance => {
     headers: {
       'Content-Type': 'application/json',
     },
-    withCredentials: true,
+    withCredentials: false,  // Set to false when using wildcard CORS origins
   });
 
   // Request interceptor
@@ -135,6 +135,15 @@ const createAdminApiClient = (): AxiosInstance => {
         localStorage.removeItem('user');
         window.location.href = '/login';
       }
+      // Log detailed error information for debugging
+      console.error('Admin API Error:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message,
+        url: error.config?.url,
+        baseURL: error.config?.baseURL,
+      });
       return Promise.reject(error);
     }
   );

@@ -125,12 +125,24 @@ export const UsersPage = () => {
         search: debouncedSearch || undefined,
       };
       
+      console.log('Fetching users with params:', params);
       const response = await adminApiService.listUsers(params);
+      console.log('Users fetched successfully:', response);
       setUsers(response.users);
       setTotal(response.total);
       setUseMockData(false);
     } catch (err: any) {
-      console.log('API error, using mock data:', err);
+      console.error('API error fetching users:', {
+        message: err.message,
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        data: err.response?.data,
+        config: {
+          url: err.config?.url,
+          baseURL: err.config?.baseURL,
+          method: err.config?.method,
+        }
+      });
       // Fall back to mock data with filtering
       setUseMockData(true);
       let filtered = [...mockUsers];
@@ -141,8 +153,8 @@ export const UsersPage = () => {
       
       if (debouncedSearch) {
         const search = debouncedSearch.toLowerCase();
-        filtered = filtered.filter(u => 
-          u.email.toLowerCase().includes(search) || 
+        filtered = filtered.filter(u =>
+          u.email.toLowerCase().includes(search) ||
           (u.name && u.name.toLowerCase().includes(search))
         );
       }

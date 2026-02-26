@@ -4,6 +4,7 @@ Handles user registration, login, token refresh, logout, and user info.
 """
 
 from datetime import timedelta
+from uuid import UUID
 from jose import JWTError
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -203,9 +204,19 @@ async def refresh_token(token_refresh: TokenRefresh, db: AsyncSession = Depends(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
+    # Convert string UUID to UUID object for SQLAlchemy
+    try:
+        user_id_uuid = UUID(user_id)
+    except (ValueError, AttributeError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user ID format",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
     # Get user
     result = await db.execute(
-        select(User).where(User.id == user_id)
+        select(User).where(User.id == user_id_uuid)
     )
     user = result.scalar_one_or_none()
     

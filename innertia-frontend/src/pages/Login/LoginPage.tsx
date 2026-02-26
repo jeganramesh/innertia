@@ -8,18 +8,20 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import LoginForm from './LoginForm';
 import type { LoginInput } from '../../services/auth';
+import authService from '../../services/authService';
 
 const LoginPage: React.FC = () => {
-  const { isAuthenticated, isLoading, error, login, clearError } = useAuth();
+  const { user, isAuthenticated, isLoading, error, login, clearError } = useAuth();
   
   // Clear errors when component mounts
   useEffect(() => {
     clearError();
   }, [clearError]);
   
-  // Redirect if already authenticated
-  if (isAuthenticated && !isLoading) {
-    return <Navigate to="/student" replace />;
+  // Redirect if already authenticated - use role-based routing
+  if (isAuthenticated && !isLoading && user) {
+    const redirectPath = authService.getRoleBasedRoute(user.role);
+    return <Navigate to={redirectPath} replace />;
   }
   
   const handleSubmit = async (data: LoginInput) => {
@@ -32,7 +34,7 @@ const LoginPage: React.FC = () => {
       <header className="py-8 px-6">
         <div className="max-w-md mx-auto">
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">
-            Innertia Admin
+            Innertia
           </h1>
         </div>
       </header>

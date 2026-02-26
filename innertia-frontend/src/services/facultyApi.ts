@@ -6,7 +6,7 @@
 
 import axios, { AxiosInstance } from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 const API_V1_PREFIX = '/api/v1';
 
 // Types matching backend schemas
@@ -81,7 +81,7 @@ const createFacultyApiClient = (): AxiosInstance => {
     headers: {
       'Content-Type': 'application/json',
     },
-    withCredentials: true,
+    withCredentials: false,  // Set to false when using wildcard CORS origins
   });
 
   // Request interceptor

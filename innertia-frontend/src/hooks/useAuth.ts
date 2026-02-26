@@ -74,7 +74,8 @@ export const useAuth = (): UseAuthReturn => {
       navigate(from, { replace: true });
     } catch (err: any) {
       console.error('Login catch error:', err);
-      const message = err.response?.data?.detail || 'Login failed. Please try again.';
+      // Try to get message from the error thrown by authService, or from response
+      const message = err.message || err.response?.data?.detail || 'Login failed. Please try again.';
       setError(message);
       throw new Error(message);
     } finally {

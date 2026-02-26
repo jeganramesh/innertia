@@ -1,23 +1,24 @@
 /**
  * Account API Service
  * Handles authentication-related API calls
- * Maps to backend /account/* routes
+ * Maps to backend /accounts/* routes
  */
 
 import axios, { AxiosInstance } from 'axios';
 import type { User } from './authService';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 const API_V1_PREFIX = '/api/v1';
+const ACCOUNTS_PREFIX = '/accounts';
 
 // Create axios instance with interceptors
 const createAccountApiClient = (): AxiosInstance => {
   const client = axios.create({
-    baseURL: `${API_BASE_URL}${API_V1_PREFIX}`,
+    baseURL: `${API_BASE_URL}${API_V1_PREFIX}${ACCOUNTS_PREFIX}`,
     headers: {
       'Content-Type': 'application/json',
     },
-    withCredentials: true,
+    withCredentials: false,  // Set to false when using wildcard CORS origins
   });
 
   // Request interceptor
@@ -74,7 +75,7 @@ export const accountApiService = {
    * Login with email and password
    */
   async login(email: string, password: string): Promise<LoginResponse> {
-    const response = await accountApi.post<LoginResponse>('/account/login', { email, password });
+    const response = await accountApi.post<LoginResponse>('/login', { email, password });
     return response.data;
   },
 
@@ -82,7 +83,7 @@ export const accountApiService = {
    * Register a new user
    */
   async register(data: RegisterData): Promise<User> {
-    const response = await accountApi.post<User>('/account/register', data);
+    const response = await accountApi.post<User>('/register', data);
     return response.data;
   },
 
@@ -90,14 +91,14 @@ export const accountApiService = {
    * Logout current user
    */
   async logout(): Promise<void> {
-    await accountApi.post('/account/logout');
+    await accountApi.post('/logout');
   },
 
   /**
    * Refresh access token
    */
   async refreshToken(refreshToken: string): Promise<RefreshResponse> {
-    const response = await accountApi.post<RefreshResponse>('/account/refresh', { refresh_token: refreshToken });
+    const response = await accountApi.post<RefreshResponse>('/refresh', { refresh_token: refreshToken });
     return response.data;
   },
 
@@ -105,7 +106,7 @@ export const accountApiService = {
    * Get current user info
    */
   async getCurrentUser(): Promise<User> {
-    const response = await accountApi.get<User>('/account/me');
+    const response = await accountApi.get<User>('/me');
     return response.data;
   },
 
@@ -113,7 +114,7 @@ export const accountApiService = {
    * Verify token validity
    */
   async verifyToken(): Promise<{ valid: boolean }> {
-    const response = await accountApi.get<{ valid: boolean }>('/account/verify');
+    const response = await accountApi.get<{ valid: boolean }>('/verify');
     return response.data;
   }
 };
