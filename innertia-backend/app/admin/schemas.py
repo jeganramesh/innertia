@@ -145,6 +145,8 @@ class DashboardStats(BaseModel):
     active_sessions: int
     last_30_day_sessions: int
     users_by_role: dict
+    average_attendance_rate: float
+    total_violations_7_days: int
     
     model_config = ConfigDict(json_schema_extra={
         "example": {
@@ -160,7 +162,9 @@ class DashboardStats(BaseModel):
                 "admin": 5,
                 "faculty": 15,
                 "student": 80
-            }
+            },
+            "average_attendance_rate": 78.5,
+            "total_violations_7_days": 12
         }
     })
 
@@ -187,6 +191,100 @@ class SessionMonitorOut(BaseModel):
 class SessionListResponse(BaseModel):
     """Schema for paginated session list."""
     sessions: List[SessionMonitorOut]
+    total: int
+    page: int
+    page_size: int
+
+
+# ============ Attendance Analytics Schemas ============
+
+class AttendanceAnalyticsResponse(BaseModel):
+    """Schema for attendance analytics response."""
+    date: str
+    attendance_rate: float
+    session_count: int
+    violation_count: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AttendanceAnalyticsSummary(BaseModel):
+    """Schema for attendance analytics summary."""
+    daily_data: List[AttendanceAnalyticsResponse]
+    average_attendance_rate: float
+    total_sessions: int
+    total_violations: int
+    date_range_start: str
+    date_range_end: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ============ Session Detail Schemas ============
+
+class SessionDetailResponse(BaseModel):
+    """Schema for session detail response (admin oversight)."""
+    id: str
+    class_id: str
+    class_name: str
+    faculty_id: str
+    faculty_name: str
+    start_time: datetime
+    end_time: Optional[datetime]
+    is_active: bool
+    duration_minutes: Optional[int]
+    total_students: int
+    attendance_percentage: float
+    violation_count: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ============ System Settings Schemas ============
+
+class SystemSettingsResponse(BaseModel):
+    """Schema for system settings response."""
+    attendance_threshold: int
+    max_focus_violations: int
+    session_timeout_minutes: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SystemSettingsUpdate(BaseModel):
+    """Schema for updating system settings."""
+    attendance_threshold: Optional[int] = Field(None, ge=0, le=100)
+    max_focus_violations: Optional[int] = Field(None, ge=1)
+    session_timeout_minutes: Optional[int] = Field(None, ge=1)
+
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "attendance_threshold": 80,
+            "max_focus_violations": 5,
+            "session_timeout_minutes": 120
+        }
+    })
+
+
+# ============ Audit Log Viewer Schemas ============
+
+class AuditLogResponse(BaseModel):
+    """Schema for audit log response."""
+    id: str
+    action: str
+    performed_by: str
+    target_type: Optional[str]
+    target_id: Optional[int]
+    metadata_json: Optional[str]
+    created_at: datetime
+    ip_address: Optional[str]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AuditLogListResponse(BaseModel):
+    """Schema for paginated audit log list."""
+    logs: List[AuditLogResponse]
     total: int
     page: int
     page_size: int

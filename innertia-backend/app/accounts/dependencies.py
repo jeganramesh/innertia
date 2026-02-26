@@ -143,7 +143,11 @@ def require_roles(allowed_roles: List[str]):
     async def role_checker(
         current_user: User = Depends(get_current_active_user)
     ) -> User:
-        if current_user.role not in allowed_roles:
+        # Case-insensitive role comparison
+        user_role = str(current_user.role).lower() if current_user.role else ""
+        allowed_roles_lower = [r.lower() for r in allowed_roles]
+        
+        if user_role not in allowed_roles_lower:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Access denied. Required roles: {', '.join(allowed_roles)}"
@@ -190,11 +194,14 @@ def create_user_response(user: User) -> dict:
     Returns:
         Dict with user data
     """
+    # Convert role to lowercase for frontend compatibility
+    user_role = str(user.role).lower() if user.role else ""
+    
     return {
         "id": str(user.id),
         "email": user.email,
         "name": user.name,
-        "role": user.role,
+        "role": user_role,
         "is_active": user.is_active,
         "is_verified": user.is_verified,
         "created_at": user.created_at,

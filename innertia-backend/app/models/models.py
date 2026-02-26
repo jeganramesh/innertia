@@ -57,7 +57,7 @@ class User(Base):
     full_name = Column(String(120), nullable=True)  # Backward compat with 'name'
     email = Column(String(150), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
-    role = Column(SQLEnum(RoleEnum), nullable=False, default=RoleEnum.STUDENT, index=True)
+    role = Column(String(50), nullable=False, default="student", index=True)
     
     # Legacy field for backward compatibility
     name = Column(String(255), nullable=True)  # Kept for backward compat
