@@ -53,7 +53,7 @@ class UserUpdate(BaseModel):
 class UserOut(UserBase):
     """Schema for user response."""
     id: str
-    name: str
+    name: Optional[str] = None
     role: str
     is_active: bool
     is_verified: bool

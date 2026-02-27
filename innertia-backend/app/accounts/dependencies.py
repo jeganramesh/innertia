@@ -200,7 +200,8 @@ def create_user_response(user: User) -> dict:
     return {
         "id": str(user.id),
         "email": user.email,
-        "name": user.name,
+        "name": user.name or user.full_name or "",
+        "full_name": user.full_name or user.name or "",
         "role": user_role,
         "is_active": user.is_active,
         "is_verified": user.is_verified,
