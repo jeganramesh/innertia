@@ -37,13 +37,9 @@ export interface StudentNote {
 }
 
 export interface StudentDashboard {
-  enrolled_classes: StudentClass[];
-  recent_sessions: StudentSession[];
-  stats: {
-    total_classes: number;
-    total_sessions: number;
-    attendance_rate: number;
-  };
+  total_classes: number;
+  active_session: StudentSession | null;
+  recent_notes: StudentNote[];
 }
 
 // Create axios instance with interceptors

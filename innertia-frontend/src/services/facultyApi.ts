@@ -31,6 +31,7 @@ export interface SessionOut {
   class_id: string;
   started_at: string;
   ended_at?: string;
+  is_active?: boolean;
   status: 'scheduled' | 'in_progress' | 'completed';
 }
 
@@ -60,6 +61,7 @@ export interface StudentSyncList {
 export interface FacultyDashboard {
   classes: ClassWithEnrollment[];
   recent_sessions: SessionOut[];
+  active_session: SessionOut | null;
   stats: {
     total_classes: number;
     active_sessions: number;

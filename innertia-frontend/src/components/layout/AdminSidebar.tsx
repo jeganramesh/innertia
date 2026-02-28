@@ -165,10 +165,9 @@ export const AdminSidebar = memo(({ className, onCollapseChange }: AdminSidebarP
       <aside
         className={twMerge(
           clsx(
-            'fixed left-0 top-0 z-50 h-screen bg-white transition-all duration-300 ease-out',
+            'h-full bg-white transition-all duration-300 ease-out',
             'flex flex-col',
             isCollapsed ? 'w-[72px]' : 'w-[272px]',
-            isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
             'select-none',
             className
           )

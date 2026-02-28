@@ -150,81 +150,73 @@ export const AINotesPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg">
-                <Sparkles className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">AI Notes Generator</h1>
-                <p className="text-sm text-gray-500">Transform raw lesson notes into immersive learning content</p>
-              </div>
-            </div>
-
-            {/* Class Selector */}
-            <div className="flex items-center gap-3">
-              <FileText className="w-5 h-5 text-gray-400" />
-              <select
-                value={selectedClassId}
-                onChange={(e) => setSelectedClassId(e.target.value)}
-                disabled={isLoadingClasses}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white min-w-[200px]"
-              >
-                {isLoadingClasses ? (
-                  <option>Loading classes...</option>
-                ) : classes.length > 0 ? (
-                  classes.map((cls) => (
-                    <option key={cls.id} value={cls.id}>
-                      {cls.name}
-                    </option>
-                  ))
-                ) : (
-                  <option value="">No classes available</option>
-                )}
-              </select>
-            </div>
-          </div>
+    <div className="space-y-8">
+      {/* Page Header - Apple Style */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl lg:text-4xl font-semibold text-[#1d1d1f] tracking-tight">
+            AI Notes Generator
+          </h1>
+          <p className="text-base text-[#86868b] mt-2">
+            Transform raw lesson notes into immersive learning content.
+          </p>
+        </div>
+        {/* Class Selector */}
+        <div className="flex items-center gap-3">
+          <FileText className="w-5 h-5 text-[#86868b]" />
+          <select
+            value={selectedClassId}
+            onChange={(e) => setSelectedClassId(e.target.value)}
+            disabled={isLoadingClasses}
+            className="px-4 py-2 border border-[#d2d2d7] rounded-xl focus:ring-2 focus:ring-[#0071e3] focus:border-[#0071e3] bg-white min-w-[200px] text-[#1d1d1f]"
+          >
+            {isLoadingClasses ? (
+              <option>Loading classes...</option>
+            ) : classes.length > 0 ? (
+              classes.map((cls) => (
+                <option key={cls.id} value={cls.id}>
+                  {cls.name}
+                </option>
+              ))
+            ) : (
+              <option value="">No classes available</option>
+            )}
+          </select>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Panel - Input */}
-          <div className="space-y-4">
-            <NotesInput
-              onGenerate={handleGenerate}
-              isGenerating={isGenerating}
-              selectedClassId={selectedClassId}
-            />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left Panel - Input */}
+        <div className="space-y-4">
+          <NotesInput
+            onGenerate={handleGenerate}
+            isGenerating={isGenerating}
+            selectedClassId={selectedClassId}
+          />
 
-            {/* Tips Card */}
-            <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-100 p-4">
-              <h3 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
-                <LayoutGrid className="w-4 h-4" />
-                Tips for Best Results
-              </h3>
-              <ul className="text-sm text-blue-800 space-y-1">
-                <li>• Include key terms and definitions in your raw notes</li>
-                <li>• Mention processes or relationships you want diagrams for</li>
-                <li>• Add context about what students should learn</li>
-                <li>• Keep raw notes between 100-2000 characters for best output</li>
-              </ul>
-            </div>
+          {/* Tips Card */}
+          <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-100 p-4">
+            <h3 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
+              <LayoutGrid className="w-4 h-4" />
+              Tips for Best Results
+            </h3>
+            <ul className="text-sm text-blue-800 space-y-1">
+              <li>• Include key terms and definitions in your raw notes</li>
+              <li>• Mention processes or relationships you want diagrams for</li>
+              <li>• Add context about what students should learn</li>
+              <li>• Keep raw notes between 100-2000 characters for best output</li>
+            </ul>
           </div>
+        </div>
 
-          {/* Right Panel - Output */}
-          <div className="space-y-4">
-            <NotesViewer
-              content={generatedContent}
-              onSave={handleSave}
-              isSaving={isSaving}
-            />
-          </div>
+        {/* Right Panel - Output */}
+        <div className="space-y-4">
+          <NotesViewer
+            content={generatedContent}
+            onSave={handleSave}
+            isSaving={isSaving}
+          />
         </div>
       </div>
     </div>

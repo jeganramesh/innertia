@@ -28,7 +28,7 @@ export const Header = ({
     <header
       className={twMerge(
         clsx(
-          'sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-[#d2d2d7]',
+          'sticky top-0 z-30 bg-white/70 backdrop-blur-md border-b border-[#d2d2d7]/50',
           'h-14 lg:h-16 flex items-center justify-between px-4 lg:px-6',
           className
         )
@@ -154,3 +154,5 @@ export const PageHeader = ({
     </div>
   );
 };
+
+export default Header;

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -6,32 +6,55 @@ import {
   Search, 
   Plus, 
   FileText, 
-  Download, 
   Trash2, 
   Edit, 
   Save,
   X,
   Clock,
-  BookOpen
+  BookOpen,
+  Check,
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
-import { StudentNote } from './types';
-
-// Mock data
-const mockNotes: StudentNote[] = [
-  { id: '1', sessionId: 'sess-1', className: 'CS101 - Introduction to Programming', content: 'Binary search divides the array in half each time. Time complexity is O(log n).', slideNumber: 15, createdAt: '2024-02-18T09:30:00', updatedAt: '2024-02-18T09:30:00' },
-  { id: '2', sessionId: 'sess-1', className: 'CS101 - Introduction to Programming', content: 'Important: Binary search requires a sorted array.', slideNumber: 16, createdAt: '2024-02-18T09:35:00', updatedAt: '2024-02-18T09:35:00' },
-  { id: '3', sessionId: 'sess-2', className: 'CS201 - Data Structures', content: 'Recursion: A function that calls itself. Base case stops the recursion.', slideNumber: 8, createdAt: '2024-02-16T10:15:00', updatedAt: '2024-02-16T10:15:00' },
-];
+import { studentApiService, StudentNote } from '../../services/studentApi';
 
 export const StudentNotesPage = () => {
-  const [notes, setNotes] = useState<StudentNote[]>(mockNotes);
+  const [notes, setNotes] = useState<StudentNote[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingNote, setEditingNote] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchNotes = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        // Get dashboard which includes recent notes
+        const dashboardData = await studentApiService.getDashboard();
+        setNotes(dashboardData.recent_notes.map(note => ({
+          id: note.id,
+          session_id: note.session_id,
+          content: note.content,
+          created_at: note.created_at,
+          updated_at: note.updated_at
+        })));
+      } catch (err: any) {
+        console.error('Failed to fetch notes:', err);
+        setError(err.response?.data?.detail || 'Failed to load notes');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchNotes();
+  }, []);
 
   const filteredNotes = notes.filter(note => 
-    note.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    note.className.toLowerCase().includes(searchTerm.toLowerCase())
+    note.content.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const startEditing = (note: StudentNote) => {
@@ -39,14 +62,30 @@ export const StudentNotesPage = () => {
     setEditContent(note.content);
   };
 
-  const saveEdit = (noteId: string) => {
-    setNotes(notes.map(note => 
-      note.id === noteId 
-        ? { ...note, content: editContent, updatedAt: new Date().toISOString() }
-        : note
-    ));
-    setEditingNote(null);
-    setEditContent('');
+  const saveEdit = async (noteId: string) => {
+    setAutoSaveStatus('saving');
+    try {
+      // Get session ID from note
+      const note = notes.find(n => n.id === noteId);
+      if (note) {
+        await studentApiService.saveNote(note.session_id, editContent);
+        
+        setNotes(notes.map(n => 
+          n.id === noteId 
+            ? { ...n, content: editContent, updated_at: new Date().toISOString() }
+            : n
+        ));
+        setAutoSaveStatus('saved');
+        setTimeout(() => {
+          setAutoSaveStatus('idle');
+          setEditingNote(null);
+          setEditContent('');
+        }, 1000);
+      }
+    } catch (err) {
+      console.error('Failed to save note:', err);
+      setAutoSaveStatus('idle');
+    }
   };
 
   const cancelEdit = () => {
@@ -54,98 +93,148 @@ export const StudentNotesPage = () => {
     setEditContent('');
   };
 
-  const deleteNote = (noteId: string) => {
+  const deleteNote = async (noteId: string) => {
     if (confirm('Are you sure you want to delete this note?')) {
-      setNotes(notes.filter(note => note.id !== noteId));
+      try {
+        await studentApiService.deleteNote(noteId);
+        setNotes(notes.filter(note => note.id !== noteId));
+      } catch (err) {
+        console.error('Failed to delete note:', err);
+        alert('Failed to delete note');
+      }
     }
   };
 
+  // Format date
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-[#0071e3]" />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-8">
+      {/* Page Header - Apple Style */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">My Notes</h1>
-          <p className="text-gray-500 mt-1">Manage your session notes</p>
+          <h1 className="text-3xl lg:text-4xl font-semibold text-[#1d1d1f] tracking-tight">
+            Your Notes
+          </h1>
+          <p className="text-base text-[#86868b] mt-2 max-w-xl">
+            Take notes during sessions and review them later.
+          </p>
         </div>
-        <Button variant="outline" className="flex items-center gap-2">
-          <Download className="w-4 h-4" />
-          Export All
-        </Button>
+        {autoSaveStatus !== 'idle' && (
+          <div className="flex items-center gap-2 text-sm text-[#86868b]">
+            {autoSaveStatus === 'saving' ? (
+              <>
+                <div className="w-4 h-4 border-2 border-[#86868b] border-t-transparent rounded-full animate-spin" />
+                <span>Saving...</span>
+              </>
+            ) : (
+              <>
+                <Check className="w-4 h-4 text-green-600" />
+                <span>Saved</span>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Search */}
-      <Card className="p-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <Input
-            placeholder="Search notes..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+      {/* Error Message */}
+      {error && (
+        <div className="flex items-center gap-3 p-4 bg-red-50 text-red-600 rounded-xl">
+          <AlertCircle className="w-5 h-5" />
+          {error}
         </div>
-      </Card>
+      )}
 
-      {/* Notes List */}
-      <div className="space-y-4">
+      {/* Search - Apple Style */}
+      <div className="relative">
+        <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-[#86868b]" />
+        <Input
+          placeholder="Search notes..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="h-14 pl-14 rounded-2xl bg-[#f5f5f7] border-0 focus:bg-white text-lg"
+        />
+      </div>
+
+      {/* Notes List - Apple Style */}
+      <div className="space-y-5">
         {filteredNotes.length === 0 ? (
-          <Card className="p-8 text-center">
-            <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500">No notes found</p>
+          <Card className="p-12 rounded-2xl text-center">
+            <FileText className="w-16 h-16 text-[#d2d2d7] mx-auto mb-4" />
+            <p className="text-lg text-[#86868b]">
+              {searchTerm ? 'No notes match your search.' : 'No notes yet. Start a session to take notes!'}
+            </p>
           </Card>
         ) : (
           filteredNotes.map((note) => (
-            <Card key={note.id} className="p-5">
+            <Card key={note.id} className="p-6 rounded-2xl border-0 shadow-sm hover:shadow-md transition-shadow duration-200">
               {editingNote === note.id ? (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <textarea
                     value={editContent}
                     onChange={(e) => setEditContent(e.target.value)}
-                    className="w-full p-3 border rounded-lg resize-none"
-                    rows={3}
+                    className="w-full p-4 border border-[#d2d2d7] rounded-xl resize-none text-lg"
+                    rows={4}
                     autoFocus
                   />
-                  <div className="flex justify-end gap-2">
-                    <Button variant="ghost" size="sm" onClick={cancelEdit}>
-                      <X className="w-4 h-4 mr-1" />
+                  <div className="flex justify-end gap-3">
+                    <Button variant="ghost" className="h-11 px-5 rounded-xl" onClick={cancelEdit}>
+                      <X className="w-5 h-5 mr-2" />
                       Cancel
                     </Button>
-                    <Button size="sm" onClick={() => saveEdit(note.id)}>
-                      <Save className="w-4 h-4 mr-1" />
+                    <Button className="h-11 px-5 rounded-xl" onClick={() => saveEdit(note.id)}>
+                      <Save className="w-5 h-5 mr-2" />
                       Save
                     </Button>
                   </div>
                 </div>
               ) : (
                 <>
-                  <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-start justify-between mb-4">
                     <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <BookOpen className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm font-medium text-gray-900">{note.className}</span>
+                      <div className="flex items-center gap-2 mb-2">
+                        <BookOpen className="w-5 h-5 text-[#86868b]" />
+                        <span className="text-base font-medium text-[#1d1d1f]">Session Note</span>
                       </div>
-                      <div className="flex items-center gap-3 text-xs text-gray-500">
+                      <div className="flex items-center gap-4 text-sm text-[#86868b]">
                         <span className="flex items-center gap-1">
-                          <FileText className="w-3 h-3" />
-                          Slide {note.slideNumber}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {new Date(note.createdAt).toLocaleString()}
+                          <Clock className="w-4 h-4" />
+                          {formatDate(note.created_at)}
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => startEditing(note)}>
-                        <Edit className="w-4 h-4" />
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant="ghost" 
+                        className="h-11 px-4 rounded-xl text-[#86868b] hover:text-[#1d1d1f]"
+                        onClick={() => startEditing(note)}
+                      >
+                        <Edit className="w-5 h-5" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="text-red-600" onClick={() => deleteNote(note.id)}>
-                        <Trash2 className="w-4 h-4" />
+                      <Button 
+                        variant="ghost" 
+                        className="h-11 px-4 rounded-xl text-[#86868b] hover:text-red-600"
+                        onClick={() => deleteNote(note.id)}
+                      >
+                        <Trash2 className="w-5 h-5" />
                       </Button>
                     </div>
                   </div>
-                  <p className="text-gray-700 whitespace-pre-wrap">{note.content}</p>
+                  <p className="text-base text-[#1d1d1f] whitespace-pre-wrap leading-relaxed">{note.content}</p>
                 </>
               )}
             </Card>

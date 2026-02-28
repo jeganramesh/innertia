@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -8,33 +8,118 @@ import {
   ChevronLeft, 
   ChevronRight,
   FileText,
-  MessageSquare,
   Send,
-  Download,
   Clock,
-  Eye,
   AlertTriangle,
-  CheckCircle
+  CheckCircle,
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
-import { AIQuestion } from './types';
+import { studentApiService, StudentSession } from '../../services/studentApi';
+import { useNavigate } from 'react-router-dom';
 
-// Mock data
-const mockAIQuestions: AIQuestion[] = [
-  { id: '1', question: 'What is the time complexity of binary search?', answer: 'O(log n) - Binary search has logarithmic time complexity because it divides the search space in half with each comparison.', slideContext: 15, status: 'answered', createdAt: '2024-02-18T09:30:00' },
-  { id: '2', question: 'Can you explain recursion with an example?', status: 'pending', createdAt: '2024-02-18T09:35:00' },
-];
+interface SlideState {
+  current_slide: number;
+  is_locked: boolean;
+}
+
+interface Question {
+  id: string;
+  question: string;
+  answer?: string;
+  status: 'pending' | 'answered';
+  slideContext?: number;
+  createdAt: string;
+}
 
 export const StudentSessionPage = () => {
-  const [currentSlide, setCurrentSlide] = useState(15);
-  const [totalSlides] = useState(45);
+  const navigate = useNavigate();
+  const [session, setSession] = useState<StudentSession | null>(null);
+  const [slideState, setSlideState] = useState<SlideState | null>(null);
+  const [currentSlide, setCurrentSlide] = useState(1);
+  const [totalSlides] = useState(45); // Would need backend for actual count
   const [slideLocked, setSlideLocked] = useState(true);
   const [aiQuestion, setAiQuestion] = useState('');
-  const [questions, setQuestions] = useState<AIQuestion[]>(mockAIQuestions);
-  const [focusStatus] = useState({ percentage: 92, status: 'good' });
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
+  // Fetch session data
+  const fetchSessionData = useCallback(async () => {
+    try {
+      // Get current session
+      const currentSession = await studentApiService.getCurrentSession();
+      
+      if (currentSession) {
+        setSession(currentSession);
+        
+        // Calculate elapsed time
+        const startTime = new Date(currentSession.started_at).getTime();
+        const now = Date.now();
+        const mins = Math.floor((now - startTime) / 60000);
+        setElapsedTime(mins);
+        
+        // For slide state, we'd need to call a backend endpoint
+        // For now, default to slide 1, unlocked
+        setSlideState({
+          current_slide: 1,
+          is_locked: false
+        });
+        setCurrentSlide(1);
+      } else {
+        // No active session - redirect to dashboard
+        navigate('/student');
+      }
+    } catch (err: any) {
+      console.error('Failed to fetch session:', err);
+      setError(err.response?.data?.detail || 'Failed to load session');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [navigate]);
+
+  useEffect(() => {
+    fetchSessionData();
+    
+    // Poll for updates every 10 seconds
+    const interval = setInterval(fetchSessionData, 10000);
+    return () => clearInterval(interval);
+  }, [fetchSessionData]);
+
+  // Timer update
+  useEffect(() => {
+    if (session?.status === 'in_progress') {
+      const startTime = new Date(session.started_at).getTime();
+      const updateTimer = () => {
+        const now = Date.now();
+        const mins = Math.floor((now - startTime) / 60000);
+        setElapsedTime(mins);
+      };
+      
+      updateTimer();
+      const interval = setInterval(updateTimer, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [session]);
+
+  const formatTime = (mins: number) => {
+    const hours = Math.floor(mins / 60);
+    const minutes = mins % 60;
+    return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+  };
+
+  // Handle slide change (would call backend API in production)
+  const handleSlideChange = (newSlide: number) => {
+    if (newSlide >= 1 && newSlide <= totalSlides && !slideLocked) {
+      setCurrentSlide(newSlide);
+    }
+  };
+
+  // Ask question
   const askQuestion = () => {
     if (!aiQuestion.trim()) return;
-    const newQuestion: AIQuestion = {
+    const newQuestion: Question = {
       id: `q-${Date.now()}`,
       question: aiQuestion,
       status: 'pending',
@@ -45,28 +130,59 @@ export const StudentSessionPage = () => {
     setAiQuestion('');
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-[#0071e3]" />
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px]">
+        <AlertCircle className="w-12 h-12 text-[#86868b] mb-4" />
+        <p className="text-lg text-[#86868b]">No active session</p>
+        <Button 
+          className="mt-4"
+          onClick={() => navigate('/student')}
+        >
+          Go to Dashboard
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
-      {/* Session Header */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-8">
+      {/* Error Message */}
+      {error && (
+        <div className="flex items-center gap-3 p-4 bg-red-50 text-red-600 rounded-xl">
+          <AlertCircle className="w-5 h-5" />
+          {error}
+        </div>
+      )}
+
+      {/* Session Header - Apple Style */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">CS101 - Introduction to Programming</h1>
-          <p className="text-gray-500 mt-1">Dr. John Smith • Session in Progress</p>
+          <h1 className="text-3xl lg:text-4xl font-semibold text-[#1d1d1f] tracking-tight">
+            Active Session
+          </h1>
+          <p className="text-base text-[#86868b] mt-2">
+            {session.class_name} • In Progress
+          </p>
         </div>
         <div className="flex items-center gap-4">
-          {/* Focus Status */}
-          <div className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
-            focusStatus.status === 'good' ? 'bg-green-100 text-green-700' :
-            focusStatus.status === 'warning' ? 'bg-yellow-100 text-yellow-700' :
-            'bg-red-100 text-red-700'
-          }`}>
-            <Eye className="w-5 h-5" />
-            <span className="font-medium">{focusStatus.percentage}% Focus</span>
+          {/* Session Duration */}
+          <div className="flex items-center gap-3 px-5 py-3 bg-[#f5f5f7] rounded-xl">
+            <Clock className="w-5 h-5 text-[#86868b]" />
+            <span className="text-lg font-semibold text-[#1d1d1f]">{formatTime(elapsedTime)}</span>
           </div>
           
           {/* Slide Lock Status */}
-          <div className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
-            slideLocked ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'
+          <div className={`px-5 py-3 rounded-xl flex items-center gap-3 ${
+            slideLocked ? 'bg-blue-100 text-blue-700' : 'bg-[#f5f5f7] text-[#1d1d1f]'
           }`}>
             {slideLocked ? <Lock className="w-5 h-5" /> : <Unlock className="w-5 h-5" />}
             <span className="font-medium">{slideLocked ? 'Slides Locked' : 'Slides Unlocked'}</span>
@@ -76,14 +192,14 @@ export const StudentSessionPage = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content - Slide View */}
-        <div className="lg:col-span-2 space-y-4">
-          <Card className="p-6">
+        <div className="lg:col-span-2 space-y-6">
+          <Card className="p-8 rounded-2xl border-0 shadow-sm">
             {/* Slide Display Area */}
-            <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center mb-4">
+            <div className="aspect-video bg-[#f5f5f7] rounded-2xl flex items-center justify-center mb-8">
               <div className="text-center">
-                <FileText className="w-20 h-20 text-gray-400 mx-auto mb-3" />
-                <p className="text-lg text-gray-600">Slide {currentSlide} of {totalSlides}</p>
-                <p className="text-sm text-gray-400">Binary Search Algorithm</p>
+                <FileText className="w-24 h-24 text-[#86868b] mx-auto mb-4" />
+                <p className="text-2xl text-[#1d1d1f]">Slide {currentSlide} of {totalSlides}</p>
+                <p className="text-lg text-[#86868b] mt-2">Binary Search Algorithm</p>
               </div>
             </div>
 
@@ -91,107 +207,109 @@ export const StudentSessionPage = () => {
             <div className="flex items-center justify-between">
               <Button 
                 variant="outline" 
+                className="h-12 px-6 rounded-xl"
                 disabled={currentSlide <= 1 || slideLocked}
-                onClick={() => setCurrentSlide(currentSlide - 1)}
+                onClick={() => handleSlideChange(currentSlide - 1)}
               >
-                <ChevronLeft className="w-5 h-5" />
+                <ChevronLeft className="w-6 h-6" />
               </Button>
               
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">Slide</span>
+              <div className="flex items-center gap-3">
+                <span className="text-base text-[#86868b]">Slide</span>
                 <Input
                   type="number"
                   value={currentSlide}
-                  onChange={(e) => setCurrentSlide(parseInt(e.target.value) || 1)}
-                  className="w-16 text-center"
+                  onChange={(e) => handleSlideChange(parseInt(e.target.value) || 1)}
+                  className="w-20 h-12 text-center text-lg rounded-xl"
                   disabled={slideLocked}
                   min={1}
                   max={totalSlides}
                 />
-                <span className="text-sm text-gray-500">of {totalSlides}</span>
+                <span className="text-base text-[#86868b]">of {totalSlides}</span>
               </div>
 
               <Button 
                 variant="outline"
+                className="h-12 px-6 rounded-xl"
                 disabled={currentSlide >= totalSlides || slideLocked}
-                onClick={() => setCurrentSlide(currentSlide + 1)}
+                onClick={() => handleSlideChange(currentSlide + 1)}
               >
-                <ChevronRight className="w-5 h-5" />
+                <ChevronRight className="w-6 h-6" />
               </Button>
             </div>
           </Card>
 
-          {/* AI Assistant */}
-          <Card className="p-6">
+          {/* AI Assistant - Constrained */}
+          <Card className="p-6 rounded-2xl border-0 shadow-sm">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                <MessageSquare className="w-5 h-5" />
-                AI Assistant
-              </h3>
-              <span className="text-xs text-gray-500">Ask questions about the slides</span>
+              <h3 className="text-lg font-semibold text-[#1d1d1f]">Ask About This Slide</h3>
             </div>
             
             {/* Question Input */}
-            <div className="flex gap-2 mb-4">
+            <div className="flex gap-3 mb-4">
               <Input
                 placeholder="Ask a question about the current slide..."
                 value={aiQuestion}
                 onChange={(e) => setAiQuestion(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && askQuestion()}
-                className="flex-1"
+                className="h-12 rounded-xl"
               />
-              <Button onClick={askQuestion}>
-                <Send className="w-4 h-4" />
+              <Button className="h-12 px-6 rounded-xl" onClick={askQuestion}>
+                <Send className="w-5 h-5" />
               </Button>
             </div>
 
             {/* Questions List */}
-            <div className="space-y-3 max-h-64 overflow-y-auto">
-              {questions.map((q) => (
-                <div key={q.id} className={`p-3 rounded-lg ${
-                  q.status === 'answered' ? 'bg-green-50 border border-green-200' : 'bg-gray-50'
-                }`}>
-                  <p className="text-sm font-medium text-gray-900">{q.question}</p>
-                  {q.slideContext && (
-                    <p className="text-xs text-gray-400 mt-1">From slide {q.slideContext}</p>
-                  )}
-                  {q.answer && (
-                    <div className="mt-2 pt-2 border-t border-green-200">
-                      <p className="text-sm text-gray-700">{q.answer}</p>
-                    </div>
-                  )}
-                  {q.status === 'pending' && (
-                    <div className="mt-2 flex items-center gap-1 text-xs text-yellow-600">
-                      <Clock className="w-3 h-3" />
-                      Waiting for response...
-                    </div>
-                  )}
-                </div>
-              ))}
+            <div className="space-y-3 max-h-48 overflow-y-auto">
+              {questions.length === 0 ? (
+                <p className="text-center text-[#86868b] py-4">No questions yet. Ask your first question!</p>
+              ) : (
+                questions.map((q) => (
+                  <div key={q.id} className={`p-4 rounded-xl ${
+                    q.status === 'answered' ? 'bg-green-50 border border-green-100' : 'bg-[#f5f5f7]'
+                  }`}>
+                    <p className="text-base text-[#1d1d1f]">{q.question}</p>
+                    {q.slideContext && (
+                      <p className="text-sm text-[#86868b] mt-1">From slide {q.slideContext}</p>
+                    )}
+                    {q.answer && (
+                      <div className="mt-3 pt-3 border-t border-green-200">
+                        <p className="text-base text-[#1d1d1f]">{q.answer}</p>
+                      </div>
+                    )}
+                    {q.status === 'pending' && (
+                      <div className="mt-2 flex items-center gap-2 text-sm text-[#86868b]">
+                        <Clock className="w-4 h-4" />
+                        Waiting for response...
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </Card>
         </div>
 
         {/* Sidebar - Session Info */}
-        <div className="space-y-4">
+        <div className="space-y-6">
           {/* Session Status */}
-          <Card className="p-5">
-            <h3 className="font-semibold text-gray-900 mb-4">Session Status</h3>
-            <div className="space-y-3">
+          <Card className="p-6 rounded-2xl border-0 shadow-sm">
+            <h3 className="text-lg font-semibold text-[#1d1d1f] mb-5">Session Status</h3>
+            <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-500">Duration</span>
-                <span className="font-medium">45 min</span>
+                <span className="text-base text-[#86868b]">Duration</span>
+                <span className="font-medium text-[#1d1d1f]">{formatTime(elapsedTime)}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-500">Your Focus</span>
-                <span className="font-medium text-green-600">{focusStatus.percentage}%</span>
+                <span className="text-base text-[#86868b]">Slide</span>
+                <span className="font-medium text-[#1d1d1f]">{currentSlide}/{totalSlides}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-500">Violations</span>
-                <span className="font-medium">0</span>
+                <span className="text-base text-[#86868b]">Violations</span>
+                <span className="font-medium text-[#1d1d1f]">0</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-500">Attendance</span>
+                <span className="text-base text-[#86868b]">Status</span>
                 <span className="font-medium text-green-600 flex items-center gap-1">
                   <CheckCircle className="w-4 h-4" />
                   Present
@@ -200,33 +318,20 @@ export const StudentSessionPage = () => {
             </div>
           </Card>
 
-          {/* Warnings */}
-          <Card className="p-5 bg-yellow-50 border-yellow-200">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5" />
-              <div>
-                <p className="font-medium text-yellow-800">Important</p>
-                <p className="text-sm text-yellow-700 mt-1">
-                  Slides are locked by the instructor. Navigation is disabled.
-                </p>
+          {/* Locked Warning */}
+          {slideLocked && (
+            <Card className="p-5 rounded-2xl border-0 shadow-sm bg-yellow-50">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5" />
+                <div>
+                  <p className="font-medium text-yellow-800">Slides Locked</p>
+                  <p className="text-sm text-yellow-700 mt-1">
+                    The instructor has locked navigation. Wait for them to unlock.
+                  </p>
+                </div>
               </div>
-            </div>
-          </Card>
-
-          {/* Quick Actions */}
-          <Card className="p-5">
-            <h3 className="font-semibold text-gray-900 mb-4">Quick Actions</h3>
-            <div className="space-y-2">
-              <Button variant="outline" className="w-full justify-start">
-                <Download className="w-4 h-4 mr-2" />
-                Download Slide
-              </Button>
-              <Button variant="outline" className="w-full justify-start">
-                <FileText className="w-4 h-4 mr-2" />
-                Take Notes
-              </Button>
-            </div>
-          </Card>
+            </Card>
+          )}
         </div>
       </div>
     </div>

@@ -1,56 +1,84 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
 import { 
   Play, 
-  Pause, 
   Square, 
   Lock, 
   Unlock,
-  ChevronLeft, 
+  Upload,
+  Clock,
+  AlertTriangle,
+  FileText,
+  ChevronLeft,
   ChevronRight,
   Users,
-  AlertTriangle,
-  TrendingUp,
-  Download,
-  MessageSquare,
-  FileText,
+  Loader2,
   RefreshCw,
-  Eye,
-  EyeOff
+  CheckCircle
 } from 'lucide-react';
-import { StudentAttendance, SlideInfo } from './types';
-
-// Mock data
-const mockStudents: StudentAttendance[] = [
-  { id: '1', studentId: 's1', studentName: 'John Doe', studentEmail: 'john@edu.com', present: true, focusPercentage: 95, violations: 0, joinTime: '09:00' },
-  { id: '2', studentId: 's2', studentName: 'Jane Smith', studentEmail: 'jane@edu.com', present: true, focusPercentage: 88, violations: 1, joinTime: '09:02' },
-  { id: '3', studentId: 's3', studentName: 'Mike Johnson', studentEmail: 'mike@edu.com', present: true, focusPercentage: 72, violations: 2, joinTime: '09:05' },
-  { id: '4', studentId: 's4', studentName: 'Sarah Williams', studentEmail: 'sarah@edu.com', present: true, focusPercentage: 91, violations: 0, joinTime: '09:00' },
-  { id: '5', studentId: 's5', studentName: 'Tom Brown', studentEmail: 'tom@edu.com', present: false, focusPercentage: 0, violations: 0 },
-  { id: '6', studentId: 's6', studentName: 'Emily Davis', studentEmail: 'emily@edu.com', present: true, focusPercentage: 85, violations: 1, joinTime: '09:03' },
-  { id: '7', studentId: 's7', studentName: 'Chris Wilson', studentEmail: 'chris@edu.com', present: true, focusPercentage: 78, violations: 1, joinTime: '09:01' },
-  { id: '8', studentId: 's8', studentName: 'Lisa Taylor', studentEmail: 'lisa@edu.com', present: true, focusPercentage: 92, violations: 0, joinTime: '09:00' },
-];
+import { facultyApiService, SessionOut, SlideStateOut, StudentSyncStatus } from '../../services/facultyApi';
 
 export const FacultySessionPage = () => {
-  const [slideInfo, setSlideInfo] = useState<SlideInfo>({
-    currentSlide: 15,
-    totalSlides: 45,
-    slideLocked: true
-  });
-  const [sessionActive, setSessionActive] = useState(true);
-  const [sessionPaused, setSessionPaused] = useState(false);
-  const [elapsedTime, setElapsedTime] = useState(45); // minutes
+  const [session, setSession] = useState<SessionOut | null>(null);
+  const [slideState, setSlideState] = useState<SlideStateOut | null>(null);
+  const [students, setStudents] = useState<StudentSyncStatus[]>([]);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'ready'>('idle');
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch session data
+  const fetchSessionData = useCallback(async () => {
+    try {
+      // Get active session
+      const activeSession = await facultyApiService.getDashboard();
+      
+      if (activeSession.active_session) {
+        setSession(activeSession.active_session);
+        
+        // Get slide states
+        const slideStates = await facultyApiService.getSlideStates(activeSession.active_session.id);
+        if (slideStates.length > 0) {
+          setSlideState(slideStates[0]);
+        }
+        
+        // Get student sync status
+        const studentSync = await facultyApiService.getStudentSyncStatus(activeSession.active_session.id);
+        setStudents(studentSync.students);
+      }
+    } catch (err: any) {
+      console.error('Failed to fetch session:', err);
+      setError(err.response?.data?.detail || 'Failed to load session');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      if (sessionActive && !sessionPaused) {
-        setElapsedTime(prev => prev + 1);
-      }
-    }, 60000);
-    return () => clearInterval(timer);
-  }, [sessionActive, sessionPaused]);
+    fetchSessionData();
+    
+    // Poll for updates every 10 seconds
+    const interval = setInterval(fetchSessionData, 10000);
+    return () => clearInterval(interval);
+  }, [fetchSessionData]);
+
+  // Timer
+  useEffect(() => {
+    if (session?.is_active && session.started_at) {
+      const startTime = new Date(session.started_at).getTime();
+      const updateTimer = () => {
+        const now = Date.now();
+        const mins = Math.floor((now - startTime) / 60000);
+        setElapsedTime(mins);
+      };
+      
+      updateTimer();
+      const interval = setInterval(updateTimer, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [session]);
 
   const formatTime = (mins: number) => {
     const hours = Math.floor(mins / 60);
@@ -58,232 +86,296 @@ export const FacultySessionPage = () => {
     return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
   };
 
-  const presentStudents = mockStudents.filter(s => s.present);
-  const syncedStudents = presentStudents.filter(s => s.focusPercentage > 70);
-  const avgFocus = Math.round(presentStudents.reduce((acc, s) => acc + s.focusPercentage, 0) / presentStudents.length);
+  // Handle start session
+  const handleStartSession = async () => {
+    try {
+      setIsLoading(true);
+      // Get first class to start session
+      const classes = await facultyApiService.getClasses();
+      if (classes.length === 0) {
+        alert('No classes available');
+        return;
+      }
+      
+      const newSession = await facultyApiService.startSession({ 
+        class_id: classes[0].id 
+      });
+      setSession(newSession);
+      setSlideState({
+        slide_number: 0,
+        locked: false
+      } as SlideStateOut);
+      fetchSessionData();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Failed to start session');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle end session
+  const handleEndSession = async () => {
+    if (!session) return;
+    
+    if (!confirm('Are you sure you want to end this session?')) return;
+    
+    try {
+      await facultyApiService.endSession(session.id);
+      setSession(null);
+      setSlideState(null);
+      setStudents([]);
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Failed to end session');
+    }
+  };
+
+  // Handle slide lock toggle
+  const handleToggleLock = async () => {
+    if (!session || !slideState) return;
+    
+    try {
+      const newLockState = !slideState.locked;
+      await facultyApiService.toggleSlideLock({
+        slide_number: slideState.slide_number,
+        locked: newLockState
+      });
+      setSlideState({ ...slideState, locked: newLockState });
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Failed to toggle lock');
+    }
+  };
+
+  // Handle slide change
+  const handleSlideChange = async (newSlide: number) => {
+    if (!session || !slideState) return;
+    
+    try {
+      await facultyApiService.toggleSlideLock({
+        slide_number: newSlide,
+        locked: slideState.locked
+      });
+      setSlideState({ ...slideState, slide_number: newSlide });
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Failed to change slide');
+    }
+  };
+
+  const presentStudents = students.filter(s => s.current_slide === (slideState?.slide_number || 0));
+  const totalViolations = 0; // Would need backend support
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-[#0071e3]" />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Session Header */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-8">
+      {/* Session Header - Apple Style */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">CS101 - Introduction to Programming</h1>
-          <p className="text-gray-500 mt-1">Live Session Control</p>
+          <h1 className="text-3xl lg:text-4xl font-semibold text-[#1d1d1f] tracking-tight">
+            Session Control
+          </h1>
+          <p className="text-base text-[#86868b] mt-2">
+            {session ? `Session ID: ${session.class_id}` : 'No active session'}
+          </p>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="text-right">
-            <p className="text-sm text-gray-500">Session Duration</p>
-            <p className="text-xl font-bold">{formatTime(elapsedTime)}</p>
-          </div>
-          <div className="flex gap-2">
-            {!sessionActive ? (
-              <Button className="flex items-center gap-2 bg-green-500 hover:bg-green-600" onClick={() => setSessionActive(true)}>
-                <Play className="w-4 h-4" />
-                Start
-              </Button>
-            ) : (
-              <>
-                {sessionPaused ? (
-                  <Button className="flex items-center gap-2 bg-green-500 hover:bg-green-600" onClick={() => setSessionPaused(false)}>
-                    <Play className="w-4 h-4" />
-                    Resume
-                  </Button>
-                ) : (
-                  <Button variant="outline" className="flex items-center gap-2" onClick={() => setSessionPaused(true)}>
-                    <Pause className="w-4 h-4" />
-                    Pause
-                  </Button>
-                )}
-                <Button variant="outline" className="flex items-center gap-2 text-red-600 border-red-300 hover:bg-red-50">
-                  <Square className="w-4 h-4" />
-                  End
-                </Button>
-              </>
-            )}
-          </div>
+        <div className="flex items-center gap-6">
+          {session?.is_active && (
+            <div className="flex items-center gap-3 px-5 py-3 bg-[#f5f5f7] rounded-xl">
+              <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+              <Clock className="w-5 h-5 text-[#86868b]" />
+              <span className="text-xl font-semibold text-[#1d1d1f]">{formatTime(elapsedTime)}</span>
+            </div>
+          )}
+          {!session ? (
+            <Button 
+              className="h-14 px-8 rounded-xl text-lg font-medium bg-green-500 hover:bg-green-600"
+              onClick={handleStartSession}
+            >
+              <Play className="w-6 h-6 mr-2" />
+              Start Session
+            </Button>
+          ) : (
+            <Button 
+              variant="outline" 
+              className="h-14 px-6 rounded-xl text-lg font-medium text-red-600 border-red-300 hover:bg-red-50"
+              onClick={handleEndSession}
+            >
+              <Square className="w-5 h-5 mr-2" />
+              End Session
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-500 rounded-lg">
-              <Users className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Present</p>
-              <p className="text-xl font-bold">{presentStudents.length}/{mockStudents.length}</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-500 rounded-lg">
-              <Eye className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Synced</p>
-              <p className="text-xl font-bold">{syncedStudents.length}/{presentStudents.length}</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-500 rounded-lg">
-              <TrendingUp className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Avg Focus</p>
-              <p className="text-xl font-bold">{avgFocus}%</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-red-500 rounded-lg">
-              <AlertTriangle className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Violations</p>
-              <p className="text-xl font-bold">5</p>
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Slide Control */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Slide Display */}
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-gray-900">Slide Control</h3>
-              <Button 
-                variant={slideInfo.slideLocked ? 'primary' : 'outline'}
-                size="sm"
-                className="flex items-center gap-2"
-                onClick={() => setSlideInfo({...slideInfo, slideLocked: !slideInfo.slideLocked})}
-              >
-                {slideInfo.slideLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-                {slideInfo.slideLocked ? 'Locked' : 'Unlocked'}
-              </Button>
-            </div>
-            
-            {/* Slide Preview Area */}
-            <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center mb-4">
-              <div className="text-center">
-                <FileText className="w-16 h-16 text-gray-400 mx-auto mb-2" />
-                <p className="text-gray-500">Slide {slideInfo.currentSlide} of {slideInfo.totalSlides}</p>
-                <p className="text-sm text-gray-400">PPT Preview Area</p>
-              </div>
-            </div>
-
-            {/* Slide Navigation */}
-            <div className="flex items-center justify-between">
-              <Button 
-                variant="outline" 
-                disabled={slideInfo.currentSlide <= 1}
-                onClick={() => setSlideInfo({...slideInfo, currentSlide: slideInfo.currentSlide - 1})}
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </Button>
-              
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">Slide</span>
-                <input 
-                  type="number" 
-                  value={slideInfo.currentSlide}
-                  onChange={(e) => setSlideInfo({...slideInfo, currentSlide: parseInt(e.target.value) || 1})}
-                  className="w-16 px-2 py-1 border rounded text-center"
-                  min={1}
-                  max={slideInfo.totalSlides}
-                />
-                <span className="text-sm text-gray-500">of {slideInfo.totalSlides}</span>
-              </div>
-
-              <Button 
-                variant="outline"
-                disabled={slideInfo.currentSlide >= slideInfo.totalSlides}
-                onClick={() => setSlideInfo({...slideInfo, currentSlide: slideInfo.currentSlide + 1})}
-              >
-                <ChevronRight className="w-5 h-5" />
-              </Button>
-            </div>
-          </Card>
-
-          {/* AI Questions */}
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-gray-900">Student Questions (AI)</h3>
-              <Button variant="outline" size="sm">
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh
-              </Button>
-            </div>
-            <div className="space-y-3">
-              <div className="p-3 bg-blue-50 rounded-lg">
-                <p className="text-sm text-gray-700">"What is the time complexity of binary search?"</p>
-                <p className="text-xs text-blue-600 mt-1">From slide 15 • 2 min ago</p>
-              </div>
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-500 italic">No more questions</p>
-              </div>
-            </div>
-          </Card>
+      {/* Error Message */}
+      {error && (
+        <div className="flex items-center gap-3 p-4 bg-red-50 text-red-600 rounded-xl">
+          <AlertTriangle className="w-5 h-5" />
+          {error}
         </div>
+      )}
 
-        {/* Student List */}
-        <Card className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-900">Students</h3>
-            <Button variant="ghost" size="sm">
-              <Download className="w-4 h-4" />
+      {/* A. Slide Upload Section - Apple Style */}
+      <Card className="p-8 rounded-2xl border-0 shadow-sm">
+        <h2 className="text-xl font-semibold text-[#1d1d1f] mb-6">Slide Upload</h2>
+        
+        {uploadStatus === 'idle' ? (
+          <div className="border-2 border-dashed border-[#d2d2d7] rounded-2xl p-12 text-center hover:border-[#0071e3] transition-colors duration-200 cursor-pointer">
+            <Upload className="w-12 h-12 text-[#86868b] mx-auto mb-4" />
+            <p className="text-lg text-[#1d1d1f] mb-2">Drag and drop your slides here</p>
+            <p className="text-base text-[#86868b]">or click to browse</p>
+          </div>
+        ) : uploadStatus === 'uploading' ? (
+          <div className="border-2 border-dashed border-[#0071e3] bg-[#0071e3]/5 rounded-2xl p-12 text-center">
+            <RefreshCw className="w-12 h-12 text-[#0071e3] mx-auto mb-4 animate-spin" />
+            <p className="text-lg text-[#1d1d1f] mb-2">Uploading slides...</p>
+          </div>
+        ) : (
+          <div className="flex items-center gap-4 p-5 bg-green-50 rounded-xl">
+            <CheckCircle className="w-6 h-6 text-green-600" />
+            <span className="text-lg text-[#1d1d1f]">45 slides ready</span>
+            <Button variant="ghost" size="sm" className="ml-auto">
+              Change
             </Button>
           </div>
-          
-          <div className="space-y-2 max-h-96 overflow-y-auto">
-            {mockStudents.map((student) => (
-              <div 
-                key={student.id} 
-                className={`p-3 rounded-lg flex items-center justify-between ${
-                  student.present ? 'bg-white border' : 'bg-gray-50'
-                }`}
-              >
+        )}
+      </Card>
+
+      {/* B. Live Control Section - Apple Style */}
+      {session?.is_active && slideState && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Slide Control */}
+          <div className="lg:col-span-2">
+            <Card className="p-8 rounded-2xl border-0 shadow-sm">
+              <div className="flex items-center justify-between mb-8">
+                <h2 className="text-xl font-semibold text-[#1d1d1f]">Slide Control</h2>
                 <div className="flex items-center gap-3">
-                  <div className={`w-2 h-2 rounded-full ${
-                    student.present ? 'bg-green-500' : 'bg-gray-300'
-                  }`} />
-                  <div>
-                    <p className={`text-sm font-medium ${student.present ? 'text-gray-900' : 'text-gray-400'}`}>
-                      {student.studentName}
-                    </p>
-                    {student.joinTime && (
-                      <p className="text-xs text-gray-400">Joined: {student.joinTime}</p>
-                    )}
-                  </div>
+                  <span className="text-base text-[#86868b]">Slide Lock</span>
+                  <button
+                    onClick={handleToggleLock}
+                    className={`w-16 h-8 rounded-full transition-colors duration-200 ${
+                      slideState.locked ? 'bg-[#0071e3]' : 'bg-[#d2d2d7]'
+                    }`}
+                  >
+                    <div className={`w-6 h-6 bg-white rounded-full shadow transition-transform duration-200 ${
+                      slideState.locked ? 'translate-x-9' : 'translate-x-1'
+                    }`} />
+                  </button>
                 </div>
-                {student.present && (
-                  <div className="text-right">
-                    <span className={`text-sm font-medium ${
-                      student.focusPercentage >= 80 ? 'text-green-600' :
-                      student.focusPercentage >= 60 ? 'text-yellow-600' : 'text-red-600'
-                    }`}>
-                      {student.focusPercentage}%
-                    </span>
-                    {student.violations > 0 && (
-                      <div className="flex items-center gap-1 text-xs text-red-500">
-                        <AlertTriangle className="w-3 h-3" />
-                        {student.violations}
+              </div>
+
+              {/* Slide Preview */}
+              <div className="aspect-video bg-[#f5f5f7] rounded-2xl flex items-center justify-center mb-8">
+                <div className="text-center">
+                  <FileText className="w-20 h-20 text-[#86868b] mx-auto mb-4" />
+                  <p className="text-2xl text-[#1d1d1f]">Slide {slideState.slide_number}</p>
+                  <p className="text-base text-[#86868b] mt-2">Binary Search Algorithm</p>
+                </div>
+              </div>
+
+              {/* Slide Navigation */}
+              <div className="flex items-center justify-between">
+                <Button 
+                  variant="outline" 
+                  size="lg"
+                  className="h-12 px-6 rounded-xl"
+                  disabled={slideState.slide_number <= 1 || slideState.locked}
+                  onClick={() => handleSlideChange(slideState.slide_number - 1)}
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </Button>
+                
+                <div className="flex items-center gap-3">
+                  <span className="text-base text-[#86868b]">Slide</span>
+                  <Input
+                    type="number"
+                    value={slideState.slide_number}
+                    onChange={(e) => handleSlideChange(parseInt(e.target.value) || 1)}
+                    className="w-20 h-12 text-center text-lg rounded-xl"
+                    disabled={slideState.locked}
+                    min={1}
+                  />
+                </div>
+
+                <Button 
+                  variant="outline"
+                  size="lg"
+                  className="h-12 px-6 rounded-xl"
+                  disabled={slideState.locked}
+                  onClick={() => handleSlideChange(slideState.slide_number + 1)}
+                >
+                  <ChevronRight className="w-6 h-6" />
+                </Button>
+              </div>
+            </Card>
+          </div>
+
+          {/* Student List */}
+          <div>
+            <Card className="p-6 rounded-2xl border-0 shadow-sm">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold text-[#1d1d1f]">Students</h2>
+                <div className="flex items-center gap-2">
+                  <Users className="w-5 h-5 text-[#86868b]" />
+                  <span className="text-base text-[#86868b]">{presentStudents.length}/{students.length}</span>
+                </div>
+              </div>
+
+              {/* Stats */}
+              <div className="flex items-center gap-4 mb-6 p-4 bg-[#f5f5f7] rounded-xl">
+                <div className="flex-1 text-center">
+                  <p className="text-2xl font-semibold text-[#1d1d1f]">{presentStudents.length}</p>
+                  <p className="text-sm text-[#86868b]">Synced</p>
+                </div>
+                <div className="w-px h-10 bg-[#d2d2d7]" />
+                <div className="flex-1 text-center">
+                  <p className="text-2xl font-semibold text-red-600">{totalViolations}</p>
+                  <p className="text-sm text-[#86868b]">Violations</p>
+                </div>
+              </div>
+
+              {/* Student List */}
+              <div className="space-y-3 max-h-80 overflow-y-auto">
+                {students.length === 0 ? (
+                  <p className="text-center text-[#86868b] py-4">No students in session</p>
+                ) : (
+                  students.map((student) => (
+                    <div 
+                      key={student.student_id} 
+                      className="flex items-center justify-between p-4 rounded-xl bg-white border border-[#f5f5f7] gap-3"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`w-3 h-3 rounded-full ${
+                          student.current_slide === slideState.slide_number ? 'bg-green-500' : 'bg-gray-300'
+                        }`} />
+                        <div>
+                          <p className="font-medium text-[#1d1d1f]">
+                            {student.student_name || student.student_id}
+                          </p>
+                          <p className="text-xs text-[#86868b]">Slide {student.current_slide}</p>
+                        </div>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  ))
                 )}
               </div>
-            ))}
+            </Card>
           </div>
+        </div>
+      )}
+
+      {/* No Active Session */}
+      {!session && (
+        <Card className="p-12 rounded-2xl border-0 shadow-sm text-center">
+          <FileText className="w-16 h-16 text-[#d2d2d7] mx-auto mb-4" />
+          <p className="text-lg text-[#86868b]">No active session. Start a session to begin.</p>
         </Card>
-      </div>
+      )}
     </div>
   );
 };
