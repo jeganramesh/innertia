@@ -14,17 +14,21 @@ import {
   Loader2,
   AlertCircle,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Building2
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../../components/ui/Dialog';
 import { adminApiService, UserOutAdmin, UserCreateAdmin, UserUpdateAdmin } from '../../services/adminApi';
 import { useAuth } from '../../hooks/useAuth';
+import { useColleges } from '../../modules/platform/admin/hooks/useColleges';
 
 // Types
+type UserRole = 'student' | 'faculty' | 'admin' | 'college_admin' | 'staff' | 'trainer' | 'platform_admin';
+
 interface UserFormData {
   email: string;
   name: string;
-  role: 'student' | 'faculty' | 'admin';
+  role: UserRole;
   password?: string;
   is_active: boolean;
 }
@@ -39,6 +43,8 @@ const initialFormData: UserFormData = {
 
 export const UsersPage = () => {
   const { user: currentUser } = useAuth();
+  const { data: collegesData } = useColleges(1, 100);
+  const colleges = collegesData?.items || [];
   
   // State
   const [users, setUsers] = useState<UserOutAdmin[]>([]);
@@ -50,7 +56,8 @@ export const UsersPage = () => {
   
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
-  const [roleFilter, setRoleFilter] = useState<'all' | 'student' | 'faculty' | 'admin'>('all');
+  const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
+  const [collegeFilter, setCollegeFilter] = useState<string | 'all'>('all');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   
   // Modals
@@ -80,11 +87,12 @@ export const UsersPage = () => {
         page,
         page_size: pageSize,
         role: roleFilter !== 'all' ? roleFilter : undefined,
+        college_id: collegeFilter !== 'all' ? collegeFilter : undefined,
         search: debouncedSearch || undefined,
       };
       
       const response = await adminApiService.listUsers(params);
-      setUsers(response.users);
+      setUsers(response.items);
       setTotal(response.total);
     } catch (err: any) {
       console.error('Failed to fetch users:', err);
@@ -94,7 +102,7 @@ export const UsersPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, roleFilter, debouncedSearch]);
+  }, [page, pageSize, roleFilter, collegeFilter, debouncedSearch]);
   
   useEffect(() => {
     fetchUsers();
@@ -103,7 +111,7 @@ export const UsersPage = () => {
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
-  }, [roleFilter, debouncedSearch]);
+  }, [roleFilter, collegeFilter, debouncedSearch]);
   
   // Calculate pagination
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -218,7 +226,7 @@ export const UsersPage = () => {
     setFormData({
       email: user.email,
       name: user.name || '',
-      role: user.role as 'student' | 'faculty' | 'admin',
+      role: (user.role as UserRole) || 'student',
       is_active: user.is_active
     });
     setFormError(null);
@@ -232,14 +240,18 @@ export const UsersPage = () => {
   };
   
   const getRoleBadge = (role: string) => {
-    const colors = {
+    const colors: Record<string, string> = {
       admin: 'bg-red-100 text-red-700',
+      platform_admin: 'bg-red-100 text-red-700',
+      college_admin: 'bg-orange-100 text-orange-700',
       faculty: 'bg-purple-100 text-purple-700',
+      staff: 'bg-green-100 text-green-700',
+      trainer: 'bg-teal-100 text-teal-700',
       student: 'bg-blue-100 text-blue-700'
     };
     return (
-      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${colors[role as keyof typeof colors]}`}>
-        {role.charAt(0).toUpperCase() + role.slice(1)}
+      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${colors[role] || 'bg-gray-100 text-gray-700'}`}>
+        {role.charAt(0).toUpperCase() + role.slice(1).replace('_', ' ')}
       </span>
     );
   };
@@ -304,15 +316,30 @@ export const UsersPage = () => {
             </div>
           </div>
           <div className="flex gap-2">
-            {(['all', 'student', 'faculty', 'admin'] as const).map((role) => (
+            {/* College Filter */}
+            <select
+              value={collegeFilter}
+              onChange={(e) => setCollegeFilter(e.target.value === 'all' ? 'all' : e.target.value)}
+              className="h-11 px-4 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Colleges</option>
+              {colleges?.map((college: any) => (
+                <option key={college.id} value={college.id}>
+                  {college.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            {(['all', 'student', 'faculty', 'staff', 'trainer', 'college_admin', 'platform_admin'] as const).map((role) => (
               <Button
                 key={role}
                 variant={roleFilter === role ? 'primary' : 'outline'}
                 size="sm"
-                className="h-11 px-5 rounded-xl"
+                className="h-11 px-4 rounded-xl text-sm"
                 onClick={() => setRoleFilter(role)}
               >
-                {role.charAt(0).toUpperCase() + role.slice(1)}
+                {role === 'all' ? 'All' : role === 'college_admin' ? 'College Admin' : role === 'platform_admin' ? 'Platform Admin' : role.charAt(0).toUpperCase() + role.slice(1)}
               </Button>
             ))}
           </div>
@@ -326,6 +353,7 @@ export const UsersPage = () => {
             <thead className="bg-[#f5f5f7]">
               <tr>
                 <th className="px-6 py-4 text-left text-[13px] font-medium text-[#86868b] uppercase tracking-[0.5px]">User</th>
+                <th className="px-6 py-4 text-left text-[13px] font-medium text-[#86868b] uppercase tracking-[0.5px]">College</th>
                 <th className="px-6 py-4 text-left text-[13px] font-medium text-[#86868b] uppercase tracking-[0.5px]">Role</th>
                 <th className="px-6 py-4 text-left text-[13px] font-medium text-[#86868b] uppercase tracking-[0.5px]">Status</th>
                 <th className="px-6 py-4 text-left text-[13px] font-medium text-[#86868b] uppercase tracking-[0.5px]">Created</th>
@@ -335,14 +363,14 @@ export const UsersPage = () => {
             <tbody className="divide-y divide-[#f5f5f7]">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center">
+                  <td colSpan={6} className="px-6 py-12 text-center">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto text-gray-400" />
                     <p className="text-gray-500 mt-2">Loading users...</p>
                   </td>
                 </tr>
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center">
+                  <td colSpan={6} className="px-6 py-12 text-center">
                     <UserCog className="w-12 h-12 mx-auto text-gray-300" />
                     <p className="text-gray-500 mt-2">No users found</p>
                     {searchTerm && (
@@ -369,6 +397,14 @@ export const UsersPage = () => {
                           <p className="font-medium text-[#1d1d1f]">{user.name || 'N/A'}</p>
                           <p className="text-sm text-[#86868b]">{user.email}</p>
                         </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="w-4 h-4 text-[#86868b]" />
+                        <span className="text-sm text-[#1d1d1f]">
+                          {user.college_name || (user.college_id ? `College #${user.college_id}` : '—')}
+                        </span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -510,12 +546,16 @@ export const UsersPage = () => {
               <label className="text-sm font-medium">Role</label>
               <select
                 value={formData.role}
-                onChange={(e) => setFormData({ ...formData, role: e.target.value as any })}
+                onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="student">Student</option>
                 <option value="faculty">Faculty</option>
+                <option value="staff">Staff</option>
+                <option value="trainer">Trainer</option>
+                <option value="college_admin">College Admin</option>
                 <option value="admin">Admin</option>
+                <option value="platform_admin">Platform Admin</option>
               </select>
             </div>
             <div className="space-y-2">
@@ -589,13 +629,17 @@ export const UsersPage = () => {
               <label className="text-sm font-medium">Role</label>
               <select
                 value={formData.role}
-                onChange={(e) => setFormData({ ...formData, role: e.target.value as any })}
+                onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 disabled={selectedUser?.id === currentUser?.id}
               >
                 <option value="student">Student</option>
                 <option value="faculty">Faculty</option>
+                <option value="staff">Staff</option>
+                <option value="trainer">Trainer</option>
+                <option value="college_admin">College Admin</option>
                 <option value="admin">Admin</option>
+                <option value="platform_admin">Platform Admin</option>
               </select>
               {selectedUser?.id === currentUser?.id && (
                 <p className="text-xs text-gray-500">Cannot change your own role</p>

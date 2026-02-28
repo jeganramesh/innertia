@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, memo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
+import { getRoleRoutePrefix } from '../../app/roleConfig';
 import {
   Home,
   Upload,
@@ -99,7 +101,11 @@ interface SidebarProps {
 export const Sidebar = memo(({ className, onCollapseChange }: SidebarProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-
+  const { user } = useAuth();
+  
+  // Get role-based route prefix
+  const routePrefix = user ? getRoleRoutePrefix(user.role) : '';
+  
   // Sync with localStorage for persistence
   useEffect(() => {
     const saved = localStorage.getItem('sidebar-collapsed');
@@ -130,18 +136,41 @@ export const Sidebar = memo(({ className, onCollapseChange }: SidebarProps) => {
     return () => window.removeEventListener('keydown', handleEscape);
   }, [isMobileOpen]);
 
-  const navItems: NavItem[] = [
-    { icon: <Home size={20} />, label: 'Dashboard', path: '/dashboard' },
-    { icon: <Users size={20} />, label: 'Faculty', path: '/faculty' },
-    { icon: <Users size={20} />, label: 'Students', path: '/students' },
-    { icon: <BarChart3 size={20} />, label: 'Classes', path: '/classes' },
-    { icon: <Upload size={20} />, label: 'Upload', path: '/upload' },
-    { icon: <BarChart3 size={20} />, label: 'Analytics', path: '/analytics' },
-    { icon: <Settings size={20} />, label: 'Settings', path: '/settings' },
-  ];
+  // Dynamic nav items based on role
+  const getNavItems = (): NavItem[] => {
+    const items: NavItem[] = [
+      { icon: <Home size={20} />, label: 'Dashboard', path: `${routePrefix}/dashboard` },
+    ];
+    
+    // Add role-specific items
+    if (user?.role === 'staff') {
+      items.push(
+        { icon: <BarChart3 size={20} />, label: 'Classes', path: `${routePrefix}/classes` },
+        { icon: <Users size={20} />, label: 'Students', path: `${routePrefix}/students` },
+        { icon: <BarChart3 size={20} />, label: 'Reports', path: `${routePrefix}/reports` }
+      );
+    } else if (user?.role === 'trainer') {
+      items.push(
+        { icon: <Users size={20} />, label: 'Students', path: `${routePrefix}/students` },
+        { icon: <BarChart3 size={20} />, label: 'Assessments', path: `${routePrefix}/assessments` }
+      );
+    } else {
+      // Default admin-like items
+      items.push(
+        { icon: <Users size={20} />, label: 'Faculty', path: `${routePrefix}/faculty` },
+        { icon: <Users size={20} />, label: 'Students', path: `${routePrefix}/students` },
+        { icon: <BarChart3 size={20} />, label: 'Classes', path: `${routePrefix}/classes` },
+        { icon: <Upload size={20} />, label: 'Upload', path: `${routePrefix}/upload` },
+        { icon: <BarChart3 size={20} />, label: 'Analytics', path: `${routePrefix}/analytics` },
+      );
+    }
+    
+    return items;
+  };
 
+  const navItems = getNavItems();
   const dashboardItems = navItems.slice(0, 5); // First 5 items
-  const systemItems = navItems.slice(5); // Last 2 items
+  const systemItems = navItems.slice(5); // Remaining items
 
   const toggleCollapse = useCallback(() => {
     setIsCollapsed((prev) => !prev);

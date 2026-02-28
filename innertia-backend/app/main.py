@@ -11,10 +11,22 @@ from app.core.config import settings
 from app.core.database import init_db, close_db
 from app.core.redis import redis_client
 from app.core.security import setup_cors, setup_rate_limiting, setup_security_headers
+
+# Import routers from new module structure
 from app.accounts.routes import router as accounts_router
+from app.modules.roles import platform_admin_router
+from app.modules.platform.admin.router import router as platform_admin_api_router
+from app.modules.colleges.router import router as colleges_router
+from app.modules.roles.college_admin.router import router as college_admin_router
+from app.modules.roles.staff.router import router as staff_router
+from app.modules.roles.faculty.router import router as faculty_router
+from app.modules.roles.trainer.router import router as trainer_router
+from app.modules.roles.student.router import router as student_router
+
+# Legacy routers for backward compatibility
 from app.admin.router import router as admin_router
-from app.faculty.router import router as faculty_router
-from app.student.router import router as student_router
+from app.faculty.router import router as legacy_faculty_router
+from app.student.router import router as legacy_student_router
 from app.ai_notes.router import router as ai_notes_router
 
 
@@ -80,11 +92,31 @@ setup_cors(app)
 setup_security_headers(app)
 setup_rate_limiting(app)
 
-# Include routers
+# Include routers - New modular structure
 app.include_router(accounts_router, prefix=settings.API_V1_PREFIX)
+
+# Platform admin routes (new)
+app.include_router(platform_admin_router, prefix=settings.API_V1_PREFIX)
+app.include_router(platform_admin_api_router, prefix=settings.API_V1_PREFIX)
+
+# Legacy admin routes (backward compatibility - maps to /admin/*)
 app.include_router(admin_router, prefix=settings.API_V1_PREFIX)
+
+# College routes (all roles)
+app.include_router(colleges_router, prefix=settings.API_V1_PREFIX)
+
+# Role-specific routes
+app.include_router(college_admin_router, prefix=settings.API_V1_PREFIX)
+app.include_router(staff_router, prefix=settings.API_V1_PREFIX)
 app.include_router(faculty_router, prefix=settings.API_V1_PREFIX)
+app.include_router(trainer_router, prefix=settings.API_V1_PREFIX)
 app.include_router(student_router, prefix=settings.API_V1_PREFIX)
+
+# Legacy role routers (backward compatibility)
+app.include_router(legacy_faculty_router, prefix=settings.API_V1_PREFIX)
+app.include_router(legacy_student_router, prefix=settings.API_V1_PREFIX)
+
+# Legacy AI notes router
 app.include_router(ai_notes_router, prefix=settings.API_V1_PREFIX)
 
 

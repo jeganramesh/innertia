@@ -5,10 +5,11 @@ import { StudentSidebar } from './StudentSidebar';
 import { Header } from './Header';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { useAuth } from '../../hooks/useAuth';
 
 interface RoleLayoutProps {
   children: ReactNode;
-  role: 'admin' | 'faculty' | 'student';
+  role: 'admin' | 'platform_admin' | 'faculty' | 'student';
 }
 
 const getStorageKey = (role: string) => `${role}-sidebar-collapsed`;
@@ -29,6 +30,7 @@ export const RoleBasedLayout = ({ children, role }: RoleLayoutProps) => {
   const getSidebar = () => {
     switch (role) {
       case 'admin':
+      case 'platform_admin':
         return <AdminSidebar onCollapseChange={setIsSidebarCollapsed} />;
       case 'faculty':
         return <FacultySidebar onCollapseChange={setIsSidebarCollapsed} />;

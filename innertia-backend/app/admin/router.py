@@ -1539,3 +1539,391 @@ async def get_audit_logs(
         page=page,
         page_size=page_size
     )
+
+
+# =============================================================================
+# MULTI-TENANT COLLEGE MANAGEMENT (Platform Admin Only)
+# =============================================================================
+
+# Import the new schemas
+from app.admin.schemas import (
+    CollegeCreate, CollegeUpdate, CollegeOut, CollegeWithStats, CollegeListResponse,
+    FeatureToggleRequest, FeatureToggleResponse, FeatureListResponse,
+    RolePermissionRequest, RolePermissionResponse, RolePermissionListResponse
+)
+from app.core.feature_guard import require_platform_admin
+
+
+@router.post(
+    "/colleges",
+    response_model=CollegeOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_platform_admin)]
+)
+async def create_college(
+    college_data: CollegeCreate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Create a new college (platform admin only).
+    """
+    service = AdminService(db)
+    
+    try:
+        college = await service.create_college(
+            name=college_data.name,
+            code=college_data.code,
+            performed_by=current_user.id,
+            ip_address=request.client.host if request.client else None
+        )
+        return CollegeOut(
+            id=str(college.id),
+            name=college.name,
+            code=college.code,
+            is_active=college.is_active,
+            created_at=college.created_at,
+            updated_at=college.updated_at
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(e)
+        )
+
+
+@router.get(
+    "/colleges",
+    response_model=CollegeListResponse,
+    dependencies=[Depends(require_platform_admin)]
+)
+async def get_colleges(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    is_active: Optional[bool] = Query(None),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get all colleges with optional filtering (platform admin only).
+    """
+    service = AdminService(db)
+    
+    offset = (page - 1) * page_size
+    colleges = await service.get_colleges(
+        is_active=is_active,
+        limit=page_size,
+        offset=offset
+    )
+    
+    # Get total count
+    from app.models.models import College
+    count_result = await db.execute(select(func.count(College.id)))
+    total = count_result.scalar()
+    
+    college_list = [
+        CollegeOut(
+            id=str(c.id),
+            name=c.name,
+            code=c.code,
+            is_active=c.is_active,
+            created_at=c.created_at,
+            updated_at=c.updated_at
+        )
+        for c in colleges
+    ]
+    
+    return CollegeListResponse(
+        colleges=college_list,
+        total=total,
+        page=page,
+        page_size=page_size
+    )
+
+
+@router.get(
+    "/colleges/{college_id}",
+    response_model=CollegeWithStats,
+    dependencies=[Depends(require_platform_admin)]
+)
+async def get_college(
+    college_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get college details with statistics (platform admin only).
+    """
+    try:
+        college_uuid = uuid.UUID(college_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid college ID format"
+        )
+    
+    from app.models.models import College
+    result = await db.execute(
+        select(College).where(College.id == college_uuid)
+    )
+    college = result.scalar_one_or_none()
+    
+    if not college:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="College not found"
+        )
+    
+    service = AdminService(db)
+    stats = await service.get_college_stats(college_uuid)
+    
+    return CollegeWithStats(
+        id=str(college.id),
+        name=college.name,
+        code=college.code,
+        is_active=college.is_active,
+        created_at=college.created_at,
+        updated_at=college.updated_at,
+        total_users=stats["total_users"],
+        user_counts=stats["user_counts"]
+    )
+
+
+@router.put(
+    "/colleges/{college_id}",
+    response_model=CollegeOut,
+    dependencies=[Depends(require_platform_admin)]
+)
+async def update_college(
+    college_id: str,
+    college_data: CollegeUpdate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Update college details (platform admin only).
+    """
+    try:
+        college_uuid = uuid.UUID(college_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid college ID format"
+        )
+    
+    service = AdminService(db)
+    
+    try:
+        college = await service.update_college(
+            college_id=college_uuid,
+            name=college_data.name,
+            is_active=college_data.is_active,
+            performed_by=current_user.id,
+            ip_address=request.client.host if request.client else None
+        )
+        return CollegeOut(
+            id=str(college.id),
+            name=college.name,
+            code=college.code,
+            is_active=college.is_active,
+            created_at=college.created_at,
+            updated_at=college.updated_at
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+
+
+# =============================================================================
+# COLLEGE FEATURE TOGGLES (Platform Admin Only)
+# =============================================================================
+
+@router.get(
+    "/colleges/{college_id}/features",
+    response_model=FeatureListResponse,
+    dependencies=[Depends(require_platform_admin)]
+)
+async def get_college_features(
+    college_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get all features for a college (platform admin only).
+    """
+    try:
+        college_uuid = uuid.UUID(college_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid college ID format"
+        )
+    
+    service = AdminService(db)
+    features = await service.get_college_features(college_uuid)
+    
+    feature_list = [
+        FeatureToggleResponse(
+            id=str(f.id),
+            college_id=str(f.college_id),
+            feature_key=f.feature_key,
+            is_enabled=f.is_enabled,
+            created_at=f.created_at
+        )
+        for f in features
+    ]
+    
+    return FeatureListResponse(features=feature_list)
+
+
+@router.post(
+    "/colleges/{college_id}/features",
+    response_model=FeatureToggleResponse,
+    dependencies=[Depends(require_platform_admin)]
+)
+async def toggle_college_feature(
+    college_id: str,
+    feature_data: FeatureToggleRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Enable or disable a feature for a college (platform admin only).
+    """
+    try:
+        college_uuid = uuid.UUID(college_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid college ID format"
+        )
+    
+    service = AdminService(db)
+    
+    try:
+        feature = await service.toggle_college_feature(
+            college_id=college_uuid,
+            feature_key=feature_data.feature_key,
+            is_enabled=feature_data.is_enabled,
+            performed_by=current_user.id,
+            ip_address=request.client.host if request.client else None
+        )
+        return FeatureToggleResponse(
+            id=str(feature.id),
+            college_id=str(feature.college_id),
+            feature_key=feature.feature_key,
+            is_enabled=feature.is_enabled,
+            created_at=feature.created_at
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+
+
+# =============================================================================
+# ROLE FEATURE PERMISSIONS (College Admin)
+# =============================================================================
+
+from app.core.feature_guard import require_college_admin
+
+
+@router.get(
+    "/colleges/{college_id}/permissions",
+    response_model=RolePermissionListResponse,
+    dependencies=[Depends(require_college_admin)]
+)
+async def get_role_permissions(
+    college_id: str,
+    role: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get role permissions for a college (college admin only).
+    Users can only view permissions for their own college.
+    """
+    try:
+        college_uuid = uuid.UUID(college_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid college ID format"
+        )
+    
+    # College admin can only view their own college's permissions
+    if current_user.college_id != college_uuid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only view permissions for your own college"
+        )
+    
+    service = AdminService(db)
+    permissions = await service.get_role_permissions(college_uuid, role)
+    
+    permission_list = [
+        RolePermissionResponse(
+            id=str(p.id),
+            college_id=str(p.college_id),
+            role=p.role,
+            feature_key=p.feature_key,
+            is_enabled=p.is_enabled
+        )
+        for p in permissions
+    ]
+    
+    return RolePermissionListResponse(permissions=permission_list)
+
+
+@router.post(
+    "/colleges/{college_id}/permissions",
+    response_model=RolePermissionResponse,
+    dependencies=[Depends(require_college_admin)]
+)
+async def set_role_permission(
+    college_id: str,
+    permission_data: RolePermissionRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Set permission for a role to access a feature (college admin only).
+    Users can only modify permissions for their own college.
+    """
+    try:
+        college_uuid = uuid.UUID(college_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid college ID format"
+        )
+    
+    # College admin can only modify their own college's permissions
+    if current_user.college_id != college_uuid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only modify permissions for your own college"
+        )
+    
+    service = AdminService(db)
+    
+    permission = await service.set_role_permission(
+        college_id=college_uuid,
+        role=permission_data.role,
+        feature_key=permission_data.feature_key,
+        is_enabled=permission_data.is_enabled,
+        performed_by=current_user.id,
+        ip_address=request.client.host if request.client else None
+    )
+    
+    return RolePermissionResponse(
+        id=str(permission.id),
+        college_id=str(permission.college_id),
+        role=permission.role,
+        feature_key=permission.feature_key,
+        is_enabled=permission.is_enabled
+    )

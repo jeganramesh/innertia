@@ -1,4 +1,4 @@
-import { forwardRef, type HTMLAttributes } from 'react';
+import { forwardRef, type HTMLAttributes, type TdHTMLAttributes } from 'react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -125,7 +125,7 @@ export const TableHead = forwardRef<HTMLTableCellElement, TableHeadProps>(
 
 TableHead.displayName = 'TableHead';
 
-interface TableCellProps extends HTMLAttributes<HTMLTableCellElement> {}
+interface TableCellProps extends TdHTMLAttributes<HTMLTableCellElement> {}
 
 export const TableCell = forwardRef<HTMLTableCellElement, TableCellProps>(
   ({ className, children, ...props }, ref) => {

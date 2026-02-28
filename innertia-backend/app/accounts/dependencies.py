@@ -15,7 +15,7 @@ from sqlalchemy import select
 
 from app.core.database import get_db
 from app.core.redis import redis_client
-from app.models.models import User
+from app.models.models import User, RoleEnum
 from app.accounts.utils import decode_token, create_access_token
 from app.accounts.schemas import TokenPayload
 from app.core.config import settings
@@ -158,10 +158,10 @@ def require_roles(allowed_roles: List[str]):
 
 
 # Convenience dependencies for common role combinations
-require_admin = require_roles(["admin"])
-require_faculty_or_admin = require_roles(["faculty", "admin"])
-require_student_or_admin = require_roles(["student", "admin"])
-require_any_role = require_roles(["student", "faculty", "admin"])
+require_admin = require_roles(["admin", "platform_admin"])
+require_faculty_or_admin = require_roles(["faculty", "admin", "platform_admin", "college_admin"])
+require_student_or_admin = require_roles(["student", "admin", "platform_admin"])
+require_any_role = require_roles(["student", "faculty", "admin", "platform_admin", "college_admin", "staff", "trainer"])
 
 
 async def get_user_by_email(
@@ -203,6 +203,7 @@ def create_user_response(user: User) -> dict:
         "name": user.name or user.full_name or "",
         "full_name": user.full_name or user.name or "",
         "role": user_role,
+        "college_id": str(user.college_id) if user.college_id else None,
         "is_active": user.is_active,
         "is_verified": user.is_verified,
         "created_at": user.created_at,

@@ -6,6 +6,27 @@ export type FileType = 'ppt' | 'pdf' | 'docx' | 'xlsx';
 
 export type UploadStatus = 'uploading' | 'processing' | 'completed' | 'error' | 'queued';
 
+export type UserRole = 'platform_admin' | 'college_admin' | 'staff' | 'faculty' | 'trainer' | 'student' | 'admin';
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  full_name: string;
+  role: UserRole;
+  college_id?: string | null;
+  is_active: boolean;
+  is_verified: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserFeatures {
+  features: string[];
+  college_id: string | null;
+  role: UserRole;
+}
+
 export interface AIFeatures {
   textExtracted: boolean;
   embeddingsGenerated: boolean;

@@ -14,7 +14,8 @@ import {
   Bell,
   Shield,
   Upload,
-  FileText
+  FileText,
+  Building2
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -133,6 +134,7 @@ export const AdminSidebar = memo(({ className, onCollapseChange }: AdminSidebarP
   const navItems: NavItem[] = [
     { icon: <Home size={20} />, label: 'Dashboard', path: '/admin/dashboard' },
     { icon: <Users size={20} />, label: 'Users', path: '/admin/users' },
+    { icon: <Building2 size={20} />, label: 'Colleges', path: '/admin/colleges' },
     { icon: <Upload size={20} />, label: 'Bulk Upload', path: '/admin/upload' },
     { icon: <BookOpen size={20} />, label: 'Classes', path: '/admin/classes' },
     { icon: <Activity size={20} />, label: 'Sessions', path: '/admin/sessions' },
@@ -141,8 +143,23 @@ export const AdminSidebar = memo(({ className, onCollapseChange }: AdminSidebarP
     { icon: <Shield size={20} />, label: 'Settings', path: '/admin/settings' },
   ];
 
+  const collegeAdminNavItems: NavItem[] = [
+    { icon: <Home size={20} />, label: 'Dashboard', path: '/college-admin/dashboard' },
+    { icon: <Users size={20} />, label: 'Users', path: '/college-admin/users' },
+    { icon: <BookOpen size={20} />, label: 'Classes', path: '/college-admin/classes' },
+    { icon: <Shield size={20} />, label: 'Role Features', path: '/college-admin/role-features' },
+  ];
+
   const dashboardItems = navItems.slice(0, 4);
   const systemItems = navItems.slice(4);
+  
+  // Check if we're in college-admin section
+  const isCollegeAdmin = location.pathname.startsWith('/college-admin');
+  
+  // Use different nav items for college admin
+  const displayItems = isCollegeAdmin ? collegeAdminNavItems : navItems;
+  const displayDashboardItems = isCollegeAdmin ? displayItems : displayItems.slice(0, 4);
+  const displaySystemItems = isCollegeAdmin ? [] : displayItems.slice(4);
 
   const toggleCollapse = useCallback(() => {
     setIsCollapsed((prev) => !prev);
@@ -206,16 +223,18 @@ export const AdminSidebar = memo(({ className, onCollapseChange }: AdminSidebarP
           <div className="space-y-8">
             <NavSection
               title="Management"
-              items={dashboardItems}
+              items={displayDashboardItems}
               isCollapsed={isCollapsed}
             />
-            <div className="border-t border-[#d2d2d7] pt-8">
-              <NavSection
-                title="System"
-                items={systemItems}
-                isCollapsed={isCollapsed}
-              />
-            </div>
+            {displaySystemItems.length > 0 && (
+              <div className="border-t border-[#d2d2d7] pt-8">
+                <NavSection
+                  title="System"
+                  items={displaySystemItems}
+                  isCollapsed={isCollapsed}
+                />
+              </div>
+            )}
           </div>
         </div>
 

@@ -288,3 +288,150 @@ class AuditLogListResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+# ============ Multi-Tenant College Schemas ============
+
+class CollegeCreate(BaseModel):
+    """Schema for creating a college."""
+    name: str = Field(..., min_length=1, max_length=255)
+    code: str = Field(..., min_length=2, max_length=100, pattern="^[A-Z0-9_]+$")
+    
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "name": "MIT College of Engineering",
+            "code": "MIT_ENG"
+        }
+    })
+
+
+class CollegeUpdate(BaseModel):
+    """Schema for updating a college."""
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    is_active: Optional[bool] = None
+    
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "name": "Updated College Name",
+            "is_active": True
+        }
+    })
+
+
+class CollegeOut(BaseModel):
+    """Schema for college response."""
+    id: str
+    name: str
+    code: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CollegeWithStats(CollegeOut):
+    """Schema for college with statistics."""
+    total_users: int = 0
+    user_counts: dict = {}
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CollegeListResponse(BaseModel):
+    """Schema for paginated college list."""
+    colleges: List[CollegeOut]
+    total: int
+    page: int
+    page_size: int
+
+
+# ============ Feature Toggle Schemas ============
+
+class FeatureToggleRequest(BaseModel):
+    """Schema for toggling a feature."""
+    feature_key: str = Field(..., pattern="^[a-z_]+$")
+    is_enabled: bool
+    
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "feature_key": "attendance_tracking",
+            "is_enabled": True
+        }
+    })
+
+
+class FeatureToggleResponse(BaseModel):
+    """Schema for feature toggle response."""
+    id: str
+    college_id: str
+    feature_key: str
+    is_enabled: bool
+    created_at: datetime
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+class FeatureListResponse(BaseModel):
+    """Schema for feature list response."""
+    features: List[FeatureToggleResponse]
+
+
+# ============ Role Permission Schemas ============
+
+class RolePermissionRequest(BaseModel):
+    """Schema for setting role permission."""
+    role: str = Field(..., pattern="^(staff|faculty|trainer|student)$")
+    feature_key: str = Field(..., pattern="^[a-z_]+$")
+    is_enabled: bool
+    
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "role": "faculty",
+            "feature_key": "attendance_tracking",
+            "is_enabled": True
+        }
+    })
+
+
+class RolePermissionResponse(BaseModel):
+    """Schema for role permission response."""
+    id: str
+    college_id: str
+    role: str
+    feature_key: str
+    is_enabled: bool
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+class RolePermissionListResponse(BaseModel):
+    """Schema for role permission list response."""
+    permissions: List[RolePermissionResponse]
+
+
+# ============ Updated User Admin Schemas ============
+
+class UserAdminBase(BaseModel):
+    """Base user schema for admin operations."""
+    email: EmailStr
+    name: Optional[str] = None
+    role: str = Field(..., pattern="^(platform_admin|college_admin|staff|faculty|trainer|student)$")
+    is_active: bool = True
+
+
+class UserCreateAdmin(UserAdminBase):
+    """Schema for admin to create a user."""
+    password: str = Field(..., min_length=8, max_length=128)
+    college_id: Optional[str] = None  # Required for non-platform_admin roles
+    
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "email": "newuser@innertia.edu",
+            "name": "New User",
+            "password": "securepassword123",
+            "role": "student",
+            "college_id": "uuid-of-college",
+            "is_active": True
+        }
+    })

@@ -31,10 +31,98 @@ from app.models.base import Base
 # =============================================================================
 
 class RoleEnum(str, enum.Enum):
-    """User role enumeration - enforced at DB level."""
-    ADMIN = "admin"
+    """User role enumeration - enforced at DB level.
+    
+    Roles:
+    - platform_admin: System-wide administrator (SaaS owner)
+    - college_admin: College-level administrator
+    - staff: Non-teaching administrative staff
+    - faculty: Teaching staff
+    - trainer: Placement/assessment trainer
+    - student: Enrolled students
+    """
+    PLATFORM_ADMIN = "platform_admin"
+    COLLEGE_ADMIN = "college_admin"
+    STAFF = "staff"
     FACULTY = "faculty"
+    TRAINER = "trainer"
     STUDENT = "student"
+
+
+# =============================================================================
+# CORE TABLES
+# =============================================================================
+
+class College(Base):
+    """
+    Colleges table - Multi-tenant support for SaaS architecture.
+    
+    Fields:
+    - id: Primary key (UUID)
+    - name: College name
+    - code: Unique college code
+    - is_active: Whether college is active
+    - created_at: Creation timestamp
+    - updated_at: Last update timestamp
+    
+    Indexes:
+    - code (unique)
+    - is_active
+    """
+    
+    __tablename__ = "colleges"
+    __allow_unmapped__ = True
+    
+    # Primary key
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # Core fields
+    name = Column(String(255), nullable=False)
+    code = Column(String(100), unique=True, nullable=False, index=True)
+    
+    # Status
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # =========================================================================
+    # RELATIONSHIPS
+    # =========================================================================
+    
+    # Users in this college
+    users: List["User"] = relationship(
+        "User",
+        back_populates="college",
+        foreign_keys="User.college_id"
+    )
+    
+    # Classes in this college
+    classes: List["Class"] = relationship(
+        "Class",
+        back_populates="college",
+        foreign_keys="Class.college_id"
+    )
+    
+    # College features
+    features: List["CollegeFeature"] = relationship(
+        "CollegeFeature",
+        back_populates="college",
+        cascade="all, delete-orphan",
+        lazy="dynamic"
+    )
+    
+    # Role feature permissions
+    role_permissions: List["RoleFeaturePermission"] = relationship(
+        "RoleFeaturePermission",
+        back_populates="college",
+        cascade="all, delete-orphan",
+        lazy="dynamic"
+    )
+    
+    def __repr__(self) -> str:
+        return f"<College(id={self.id}, name={self.name}, code={self.code})>"
 
 
 # =============================================================================
@@ -44,14 +132,18 @@ class RoleEnum(str, enum.Enum):
 class User(Base):
     """
     Users table - stores all platform users.
+    
+    Multi-tenant: platform_admin has NULL college_id, all others MUST have college_id.
     """
     
     __tablename__ = "users"
     __allow_unmapped__ = True
-    __allow_unmapped__ = True
     
     # Primary key - UUID for SQLite/PostgreSQL compatibility
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # Multi-tenant: college reference (NULL for platform_admin)
+    college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.id"), nullable=True, index=True)
     
     # Core fields
     full_name = Column(String(120), nullable=True)  # Backward compat with 'name'
@@ -76,6 +168,13 @@ class User(Base):
     # =========================================================================
     # RELATIONSHIPS
     # =========================================================================
+    
+    # College relationship
+    college: "College" = relationship(
+        "College",
+        back_populates="users",
+        foreign_keys=[college_id]
+    )
     
     # Classes taught by faculty
     taught_classes: List["Class"] = relationship(
@@ -156,8 +255,11 @@ class Class(Base):
     """
     Classes/Courses table.
     
+    Multi-tenant: All classes must belong to a college.
+    
     Fields:
     - id: Primary key
+    - college_id: Foreign key to colleges (multi-tenant)
     - name: Class name (max 120 chars)
     - department: Department name (max 120 chars)
     - academic_year: Academic year (e.g., "2024-2025")
@@ -167,6 +269,7 @@ class Class(Base):
     - deleted_at: Soft delete timestamp
     
     Indexes:
+    - college_id
     - faculty_id
     - academic_year
     """
@@ -176,6 +279,9 @@ class Class(Base):
     
     # Primary key
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # Multi-tenant: college reference
+    college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.id"), nullable=False, index=True)
     
     # Core fields
     name = Column(String(120), nullable=False)
@@ -198,6 +304,13 @@ class Class(Base):
     # =========================================================================
     # RELATIONSHIPS
     # =========================================================================
+    
+    # College relationship
+    college: "College" = relationship(
+        "College",
+        back_populates="classes",
+        foreign_keys=[college_id]
+    )
     
     # Faculty who teaches this class
     faculty: "User" = relationship(
@@ -301,9 +414,12 @@ class Session(Base):
     """
     Sessions table - Tracks live faculty sessions.
     
+    Multi-tenant: All sessions belong to a college through the class.
+    
     Fields:
     - id: Primary key
     - class_id: Foreign key to classes
+    - college_id: Foreign key to colleges (for quick filtering)
     - faculty_id: Foreign key to users (faculty)
     - start_time: Session start timestamp
     - end_time: Session end timestamp
@@ -311,6 +427,7 @@ class Session(Base):
     - created_at: Creation timestamp
     
     Indexes:
+    - college_id
     - class_id
     - faculty_id
     - is_active
@@ -324,6 +441,7 @@ class Session(Base):
     
     # Foreign keys
     class_id = Column(UUID(as_uuid=True), ForeignKey("classes.id"), nullable=False, index=True)
+    college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.id"), nullable=False, index=True)
     faculty_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
     
     # Session timing (legacy field names kept for backward compat)
@@ -547,8 +665,11 @@ class AuditLog(Base):
     Audit Logs table - Mandatory for production compliance.
     Tracks all actions performed in the system.
     
+    Multi-tenant: college_id for cross-college isolation.
+    
     Fields:
     - id: Primary key
+    - college_id: Foreign key to colleges (NULL for platform-level actions)
     - action: Action performed (e.g., "CREATE", "UPDATE", "DELETE")
     - performed_by: Foreign key to users
     - target_type: Type of entity affected (e.g., "User", "Class")
@@ -557,6 +678,7 @@ class AuditLog(Base):
     - created_at: Timestamp of action
     
     Indexes:
+    - college_id
     - performed_by
     - created_at
     
@@ -569,6 +691,9 @@ class AuditLog(Base):
     
     # Primary key
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # Multi-tenant: college reference (NULL for platform-level)
+    college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.id"), nullable=True, index=True)
     
     # Action details
     action = Column(String(50), nullable=False)  # CREATE, UPDATE, DELETE, LOGIN, etc.
@@ -661,12 +786,142 @@ class Note(Base):
 
 
 # =============================================================================
+# MULTI-TENANT FEATURE GATING TABLES
+# =============================================================================
+
+class CollegeFeature(Base):
+    """
+    College Features table - Platform-level feature toggles per college.
+    
+    This controls which features are available to a college.
+    Platform admin enables/disables features at this level.
+    
+    Fields:
+    - id: Primary key
+    - college_id: Foreign key to colleges
+    - feature_key: Unique feature identifier
+    - is_enabled: Whether feature is enabled
+    - created_at: Timestamp
+    
+    Example features:
+    - attendance_tracking
+    - ai_notes
+    - placement_module
+    - assessment_module
+    - advanced_reports
+    - live_session_lock
+    
+    Indexes:
+    - college_id
+    - feature_key (unique per college)
+    """
+    
+    __tablename__ = "college_features"
+    __allow_unmapped__ = True
+    
+    # Primary key
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # Foreign key
+    college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.id"), nullable=False, index=True)
+    
+    # Feature configuration
+    feature_key = Column(String(100), nullable=False)
+    is_enabled = Column(Boolean, default=False, nullable=False)
+    
+    # Timestamp
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    # =========================================================================
+    # CONSTRAINTS
+    # =========================================================================
+    
+    __table_args__ = (
+        UniqueConstraint('college_id', 'feature_key', name='uq_college_feature'),
+    )
+    
+    # =========================================================================
+    # RELATIONSHIPS
+    # =========================================================================
+    
+    college: "College" = relationship(
+        "College",
+        back_populates="features",
+        foreign_keys=[college_id]
+    )
+    
+    def __repr__(self) -> str:
+        return f"<CollegeFeature(college_id={self.college_id}, feature={self.feature_key}, enabled={self.is_enabled})>"
+
+
+class RoleFeaturePermission(Base):
+    """
+    Role Feature Permissions table - College admin controls role access.
+    
+    This controls which roles can access which features within a college.
+    College admin configures permissions at this level.
+    
+    Fields:
+    - id: Primary key
+    - college_id: Foreign key to colleges
+    - role: Role that gets permission
+    - feature_key: Feature identifier
+    - is_enabled: Whether role can access feature
+    
+    Example:
+    - college enables assessment_module at college level
+    - but only trainer and student roles can access it
+    
+    Indexes:
+    - college_id
+    - role
+    - (college_id, role, feature_key) unique
+    """
+    
+    __tablename__ = "role_feature_permissions"
+    __allow_unmapped__ = True
+    
+    # Primary key
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # Foreign key
+    college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.id"), nullable=False, index=True)
+    
+    # Permission configuration
+    role = Column(String(50), nullable=False, index=True)
+    feature_key = Column(String(100), nullable=False)
+    is_enabled = Column(Boolean, default=False, nullable=False)
+    
+    # =========================================================================
+    # CONSTRAINTS
+    # =========================================================================
+    
+    __table_args__ = (
+        UniqueConstraint('college_id', 'role', 'feature_key', name='uq_role_feature_permission'),
+    )
+    
+    # =========================================================================
+    # RELATIONSHIPS
+    # =========================================================================
+    
+    college: "College" = relationship(
+        "College",
+        back_populates="role_permissions",
+        foreign_keys=[college_id]
+    )
+    
+    def __repr__(self) -> str:
+        return f"<RoleFeaturePermission(college_id={self.college_id}, role={self.role}, feature={self.feature_key})>"
+
+
+# =============================================================================
 # DATABASE INDEXES (Additional performance indexes)
 # =============================================================================
 
 __all__ = [
     "Base",
     "RoleEnum",
+    "College",
     "User",
     "RefreshToken",
     "Class",
@@ -678,4 +933,6 @@ __all__ = [
     "AuditLog",
     "SystemSetting",
     "Note",
+    "CollegeFeature",
+    "RoleFeaturePermission",
 ]

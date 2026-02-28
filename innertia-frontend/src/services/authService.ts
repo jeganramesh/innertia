@@ -12,6 +12,7 @@ const API_V1_PREFIX = '/api/v1';
 const ACCOUNTS_PREFIX = '/accounts';  // Backend uses /accounts (plural)
 
 // Types
+export type UserRole = 'platform_admin' | 'college_admin' | 'staff' | 'faculty' | 'trainer' | 'student' | 'admin';
 
 export interface LoginInput {
   email: string;
@@ -23,11 +24,18 @@ export interface User {
   email: string;
   full_name?: string;
   name?: string;
-  role: 'student' | 'faculty' | 'admin';
+  role: UserRole;
+  college_id?: string | null;
   is_active: boolean;
   is_verified?: boolean;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface UserFeatures {
+  features: string[];
+  college_id: string | null;
+  role: UserRole;
 }
 
 export interface AuthTokens {
@@ -121,7 +129,11 @@ const clearAuthData = () => {
 const TEST_CREDENTIALS = {
   student: { email: 'student@test.com', password: 'student123', role: 'student' as const, full_name: 'Test Student' },
   faculty: { email: 'faculty@test.com', password: 'faculty123', role: 'faculty' as const, full_name: 'Test Faculty' },
-  admin: { email: 'admin@test.com', password: 'admin123', role: 'admin' as const, full_name: 'Test Admin' }
+  admin: { email: 'admin@test.com', password: 'admin123', role: 'admin' as const, full_name: 'Test Admin' },
+  platform_admin: { email: 'platform@test.com', password: 'platform123', role: 'platform_admin' as const, full_name: 'Platform Admin' },
+  college_admin: { email: 'college@test.com', password: 'college123', role: 'college_admin' as const, full_name: 'College Admin' },
+  staff: { email: 'staff@test.com', password: 'staff123', role: 'staff' as const, full_name: 'Test Staff' },
+  trainer: { email: 'trainer@test.com', password: 'trainer123', role: 'trainer' as const, full_name: 'Test Trainer' }
 };
 
 // Auth Service
@@ -222,6 +234,15 @@ export const authService = {
   },
 
   /**
+   * Get user features from API
+   * This returns the list of enabled features for the current user's role and college
+   */
+  async getUserFeatures(): Promise<UserFeatures> {
+    const response = await api.get<UserFeatures>('/me/features');
+    return response.data;
+  },
+
+  /**
    * Refresh access token
    */
   async refreshToken(): Promise<AuthTokens> {
@@ -275,12 +296,20 @@ export const authService = {
    */
   getRoleBasedRoute(role: string): string {
     switch (role) {
+      case 'platform_admin':
+        return '/platform-admin/dashboard';
+      case 'college_admin':
+        return '/college-admin/dashboard';
       case 'admin':
-        return '/admin/dashboard';
+        return '/platform-admin/dashboard';
       case 'faculty':
         return '/faculty/dashboard';
       case 'student':
         return '/student/dashboard';
+      case 'staff':
+        return '/staff/dashboard';
+      case 'trainer':
+        return '/trainer/dashboard';
       default:
         return '/login';
     }

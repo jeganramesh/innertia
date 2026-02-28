@@ -64,10 +64,11 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
     role = user_data.role or "student"
     
     # Validate role
-    if role not in ["student", "faculty", "admin"]:
+    valid_roles = ["student", "faculty", "admin", "platform_admin", "college_admin", "staff", "trainer"]
+    if role not in valid_roles:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid role. Must be student, faculty, or admin"
+            detail=f"Invalid role. Must be one of: {', '.join(valid_roles)}"
         )
     
     # Create new user
@@ -302,3 +303,39 @@ async def get_current_user_info(
     Get current authenticated user's information.
     """
     return create_user_response(current_user)
+
+
+@router.get(
+    "/me/features",
+    responses={
+        401: {"model": ErrorResponse, "description": "Not authenticated"}
+    }
+)
+async def get_user_features(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get enabled features for the current user's role and college.
+    
+    This endpoint provides the feature list for frontend dynamic navigation.
+    Platform admins see all features, other roles see only enabled features.
+    """
+    from app.core.feature_guard import FeatureGuard, PLATFORM_FEATURES
+    
+    # If no college (should only be platform_admin), return all features
+    if not current_user.college_id:
+        return {
+            "features": PLATFORM_FEATURES,
+            "college_id": None,
+            "role": current_user.role
+        }
+    
+    guard = FeatureGuard(db, current_user)
+    enabled_features = await guard.get_enabled_features()
+    
+    return {
+        "features": enabled_features,
+        "college_id": str(current_user.college_id),
+        "role": current_user.role
+    }

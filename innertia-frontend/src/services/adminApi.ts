@@ -1,7 +1,7 @@
 /**
  * Admin API Service
- * Handles admin-specific API calls
- * Maps to backend /admin/* routes
+ * Handles platform admin-specific API calls
+ * Maps to backend /platform-admin/* routes
  */
 
 import axios, { AxiosInstance } from 'axios';
@@ -13,14 +13,14 @@ const API_PREFIX = '/api/v1';
 export interface UserCreateAdmin {
   email: string;
   name?: string;
-  role: 'student' | 'faculty' | 'admin';
+  role: 'student' | 'faculty' | 'admin' | 'college_admin' | 'staff' | 'trainer';
   is_active: boolean;
   password: string;
 }
 
 export interface UserUpdateAdmin {
   name?: string;
-  role?: 'student' | 'faculty' | 'admin';
+  role?: 'student' | 'faculty' | 'admin' | 'college_admin' | 'staff' | 'trainer';
   is_active?: boolean;
 }
 
@@ -32,10 +32,12 @@ export interface UserOutAdmin {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  college_id?: number;
+  college_name?: string;
 }
 
 export interface UserListResponse {
-  users: UserOutAdmin[];
+  items: UserOutAdmin[];
   total: number;
   page: number;
   page_size: number;
@@ -142,7 +144,7 @@ export interface AuditLogResponse {
 }
 
 export interface AuditLogListResponse {
-  logs: AuditLogResponse[];
+  items: AuditLogResponse[];
   total: number;
   page: number;
   page_size: number;
@@ -155,7 +157,7 @@ const createAdminApiClient = (): AxiosInstance => {
     headers: {
       'Content-Type': 'application/json',
     },
-    withCredentials: false,  // Set to false when using wildcard CORS origins
+    withCredentials: false,
   });
 
   // Request interceptor
@@ -175,9 +177,7 @@ const createAdminApiClient = (): AxiosInstance => {
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('user');
-        window.location.href = '/login';
-      }
-      // Log detailed error information for debugging
+        window.location.href = '/login';      }
       console.error('Admin API Error:', {
         status: error.response?.status,
         statusText: error.response?.statusText,
@@ -195,197 +195,123 @@ const createAdminApiClient = (): AxiosInstance => {
 
 const adminApi = createAdminApiClient();
 
-// Admin API Service
+// Admin API Service - Platform Admin endpoints
 export const adminApiService = {
   // ============ User Management ============
 
-  /**
-   * Create a new user (admin only)
-   */
   async createUser(data: UserCreateAdmin): Promise<UserOutAdmin> {
-    const response = await adminApi.post<UserOutAdmin>('/admin/users', data);
+    const response = await adminApi.post<UserOutAdmin>('/platform-admin/users', data);
     return response.data;
   },
 
-  /**
-   * List users with pagination and filters
-   */
   async listUsers(params?: {
     page?: number;
     page_size?: number;
     role?: string;
-    status?: string;
-    search?: string;
+    college_id?: string;
+    is_active?: boolean;
   }): Promise<UserListResponse> {
-    const response = await adminApi.get<UserListResponse>('/admin/users', { params });
+    const response = await adminApi.get<UserListResponse>('/platform-admin/users', { params });
     return response.data;
   },
 
-  /**
-   * Get user by ID
-   */
   async getUser(userId: string): Promise<UserOutAdmin> {
-    const response = await adminApi.get<UserOutAdmin>(`/admin/users/${userId}`);
+    const response = await adminApi.get<UserOutAdmin>(`/platform-admin/users/${userId}`);
     return response.data;
   },
 
-  /**
-   * Update user
-   */
   async updateUser(userId: string, data: UserUpdateAdmin): Promise<UserOutAdmin> {
-    const response = await adminApi.patch<UserOutAdmin>(`/admin/users/${userId}`, data);
+    const response = await adminApi.patch<UserOutAdmin>(`/platform-admin/users/${userId}`, data);
     return response.data;
   },
 
-  /**
-   * Delete user
-   */
   async deleteUser(userId: string): Promise<void> {
-    await adminApi.delete(`/admin/users/${userId}`);
+    await adminApi.delete(`/platform-admin/users/${userId}`);
   },
 
   // ============ Bulk Upload ============
 
-  /**
-   * Bulk upload users from CSV/Excel file
-   */
   async bulkUploadUsers(file: File): Promise<BulkUploadResponse> {
     const formData = new FormData();
     formData.append('file', file);
-
-    const response = await adminApi.post<BulkUploadResponse>('/admin/users/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+    const response = await adminApi.post<BulkUploadResponse>('/platform-admin/users/bulk-upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
   },
 
   // ============ Class Management ============
 
-  /**
-   * Create a new class
-   */
   async createClass(data: ClassCreate): Promise<ClassOut> {
-    const response = await adminApi.post<ClassOut>('/admin/classes', data);
+    const response = await adminApi.post<ClassOut>('/platform-admin/classes', data);
     return response.data;
   },
 
-  /**
-   * List classes
-   */
   async listClasses(params?: {
     page?: number;
     page_size?: number;
     faculty_id?: string;
-  }): Promise<{ classes: ClassOut[]; total: number }> {
-    const response = await adminApi.get<{ classes: ClassOut[]; total: number }>('/admin/classes', { params });
+  }): Promise<{ items: ClassOut[]; total: number }> {
+    const response = await adminApi.get<{ items: ClassOut[]; total: number }>('/platform-admin/classes', { params });
     return response.data;
   },
 
-  /**
-   * Get class by ID
-   */
   async getClass(classId: string): Promise<ClassOut> {
-    const response = await adminApi.get<ClassOut>(`/admin/classes/${classId}`);
+    const response = await adminApi.get<ClassOut>(`/platform-admin/classes/${classId}`);
     return response.data;
   },
 
-  /**
-   * Update class
-   */
   async updateClass(classId: string, data: ClassUpdate): Promise<ClassOut> {
-    const response = await adminApi.patch<ClassOut>(`/admin/classes/${classId}`, data);
+    const response = await adminApi.patch<ClassOut>(`/platform-admin/classes/${classId}`, data);
     return response.data;
   },
 
-  /**
-   * Delete class
-   */
   async deleteClass(classId: string): Promise<void> {
-    await adminApi.delete(`/admin/classes/${classId}`);
+    await adminApi.delete(`/platform-admin/classes/${classId}`);
   },
 
   // ============ Dashboard ============
 
-  /**
-   * Get dashboard statistics
-   */
   async getDashboardStats(): Promise<DashboardStats> {
-    const response = await adminApi.get<DashboardStats>('/admin/dashboard');
+    const response = await adminApi.get<DashboardStats>('/platform-admin/analytics');
     return response.data;
   },
 
   // ============ Session Monitoring ============
 
-  /**
-   * Get session monitoring list
-   */
   async getSessions(params?: {
     page?: number;
     page_size?: number;
     is_active?: boolean;
   }): Promise<SessionListResponse> {
-    const response = await adminApi.get<SessionListResponse>('/admin/sessions', { params });
-    return response.data;
-  },
-
-  // ============ User Toggle ============
-
-  /**
-   * Toggle user active status
-   */
-  async toggleUser(userId: string): Promise<UserOutAdmin> {
-    const response = await adminApi.patch<UserOutAdmin>(`/admin/users/${userId}/toggle`);
-    return response.data;
-  },
-
-  // ============ Analytics ============
-
-  /**
-   * Get attendance analytics
-   */
-  async getAttendanceAnalytics(params?: {
-    start_date?: string;
-    end_date?: string;
-    department?: string;
-  }): Promise<AttendanceAnalyticsSummary> {
-    const response = await adminApi.get<AttendanceAnalyticsSummary>('/admin/analytics/attendance', { params });
+    const response = await adminApi.get<SessionListResponse>('/platform-admin/sessions', { params });
     return response.data;
   },
 
   // ============ Settings ============
 
-  /**
-   * Get system settings
-   */
   async getSettings(): Promise<SystemSettings> {
-    const response = await adminApi.get<SystemSettings>('/admin/settings');
+    const response = await adminApi.get<SystemSettings>('/platform-admin/settings');
     return response.data;
   },
 
-  /**
-   * Update system settings
-   */
   async updateSettings(data: Partial<SystemSettings>): Promise<SystemSettings> {
-    const response = await adminApi.patch<SystemSettings>('/admin/settings', data);
+    const response = await adminApi.patch<SystemSettings>('/platform-admin/settings', data);
     return response.data;
   },
 
   // ============ Audit Logs ============
 
-  /**
-   * Get audit logs
-   */
   async getAuditLogs(params?: {
     page?: number;
     page_size?: number;
-    action_type?: string;
+    action?: string;
+    entity_type?: string;
     start_date?: string;
     end_date?: string;
     user_id?: string;
   }): Promise<AuditLogListResponse> {
-    const response = await adminApi.get<AuditLogListResponse>('/admin/audit-logs', { params });
+    const response = await adminApi.get<AuditLogListResponse>('/platform-admin/audit-logs', { params });
     return response.data;
   }
 };

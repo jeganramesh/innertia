@@ -7,6 +7,8 @@ export { AdminAnalyticsPage } from './AdminAnalyticsPage';
 export { AdminSettingsPage } from './AdminSettingsPage';
 export { AuditLogsPage } from './AuditLogsPage';
 export { UserBulkUpload } from './UserBulkUpload';
+export { CollegesPage } from './CollegesPage';
+export { CollegeDetailPage } from './CollegeDetailPage';
 export type { 
   AdminStats, 
   SystemConfig, 
