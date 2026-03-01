@@ -14,8 +14,7 @@ from app.core.security import setup_cors, setup_rate_limiting, setup_security_he
 
 # Import routers from new module structure
 from app.accounts.routes import router as accounts_router
-from app.modules.roles import platform_admin_router
-from app.modules.platform.admin.router import router as platform_admin_api_router
+from app.modules.roles import admin_router
 from app.modules.colleges.router import router as colleges_router
 from app.modules.roles.college_admin.router import router as college_admin_router
 from app.modules.roles.staff.router import router as staff_router
@@ -23,8 +22,10 @@ from app.modules.roles.faculty.router import router as faculty_router
 from app.modules.roles.trainer.router import router as trainer_router
 from app.modules.roles.student.router import router as student_router
 
+# Platform admin router
+from app.modules.platform.admin.router import router as platform_admin_router
+
 # Legacy routers for backward compatibility
-from app.admin.router import router as admin_router
 from app.faculty.router import router as legacy_faculty_router
 from app.student.router import router as legacy_student_router
 from app.ai_notes.router import router as ai_notes_router
@@ -95,12 +96,11 @@ setup_rate_limiting(app)
 # Include routers - New modular structure
 app.include_router(accounts_router, prefix=settings.API_V1_PREFIX)
 
-# Platform admin routes (new)
-app.include_router(platform_admin_router, prefix=settings.API_V1_PREFIX)
-app.include_router(platform_admin_api_router, prefix=settings.API_V1_PREFIX)
-
-# Legacy admin routes (backward compatibility - maps to /admin/*)
+# Admin routes
 app.include_router(admin_router, prefix=settings.API_V1_PREFIX)
+
+# Platform admin routes
+app.include_router(platform_admin_router, prefix=settings.API_V1_PREFIX)
 
 # College routes (all roles)
 app.include_router(colleges_router, prefix=settings.API_V1_PREFIX)

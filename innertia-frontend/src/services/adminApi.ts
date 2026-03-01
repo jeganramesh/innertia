@@ -16,6 +16,7 @@ export interface UserCreateAdmin {
   role: 'student' | 'faculty' | 'admin' | 'college_admin' | 'staff' | 'trainer';
   is_active: boolean;
   password: string;
+  college_id?: string;
 }
 
 export interface UserUpdateAdmin {

@@ -44,7 +44,7 @@ TEST_USERS = [
         "email": "admin@test.com",
         "password": "admin123",
         "name": "Test Admin",
-        "role": "admin",
+        "role": "admin",  # System-wide admin
         "is_active": True,
         "is_verified": True,
     },
@@ -53,7 +53,7 @@ TEST_USERS = [
         "email": "admin@innertia.com",
         "password": "admin123",
         "name": "System Admin",
-        "role": "admin",
+        "role": "admin",  # System-wide admin
         "is_active": True,
         "is_verified": True,
     },

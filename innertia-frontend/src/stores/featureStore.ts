@@ -56,8 +56,8 @@ export const FeatureProvider: React.FC<FeatureProviderProps> = ({ children }) =>
 
   const hasFeature = (feature: string): boolean => {
     if (!features) return false;
-    // Platform admin has all features
-    if (features.role === 'platform_admin') return true;
+    // Admin has all features
+    if (features.role === 'admin') return true;
     // Check if feature is in enabled list
     return features.features.includes(feature);
   };
@@ -100,7 +100,7 @@ export const getNavigationItems = (features: UserFeatures | null, role: string) 
 
   const { hasFeature } = {
     hasFeature: (f: string) => {
-      if (role === 'platform_admin') return true;
+      if (role === 'admin') return true;
       return features.features.includes(f);
     }
   };
@@ -114,7 +114,7 @@ export const getNavigationItems = (features: UserFeatures | null, role: string) 
 
   // Role-specific navigation
   switch (role) {
-    case 'platform_admin':
+    case 'admin':
     case 'college_admin':
       if (hasFeature(FEATURES.COLLEGE_ANALYTICS)) {
         navigation.push(

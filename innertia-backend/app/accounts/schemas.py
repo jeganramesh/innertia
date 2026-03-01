@@ -19,7 +19,7 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     """Schema for creating a new user."""
     password: str = Field(..., min_length=8, max_length=128)
-    role: Optional[str] = Field(None, pattern="^(platform_admin|college_admin|staff|faculty|trainer|student)$")
+    role: Optional[str] = Field(None, pattern="^(admin|college_admin|staff|faculty|trainer|student)$")
     
     model_config = ConfigDict(json_schema_extra={
         "example": {
@@ -145,19 +145,16 @@ class ValidationErrorResponse(BaseModel):
 
 class RoleEnum:
     """Role constants for multi-tenant system."""
-    PLATFORM_ADMIN = "platform_admin"
+    ADMIN = "admin"
     COLLEGE_ADMIN = "college_admin"
     STAFF = "staff"
     FACULTY = "faculty"
     TRAINER = "trainer"
     STUDENT = "student"
     
-    # Legacy roles for backward compatibility
-    ADMIN = "admin"
-    
     @classmethod
     def all(cls):
-        return [cls.PLATFORM_ADMIN, cls.COLLEGE_ADMIN, cls.STAFF, cls.FACULTY, cls.TRAINER, cls.STUDENT]
+        return [cls.ADMIN, cls.COLLEGE_ADMIN, cls.STAFF, cls.FACULTY, cls.TRAINER, cls.STUDENT]
     
     @classmethod
     def teaching_roles(cls):
@@ -165,4 +162,4 @@ class RoleEnum:
     
     @classmethod
     def admin_roles(cls):
-        return [cls.PLATFORM_ADMIN, cls.COLLEGE_ADMIN, cls.ADMIN]
+        return [cls.ADMIN, cls.COLLEGE_ADMIN]

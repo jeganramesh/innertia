@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_
 
 from app.core.database import get_db
+from app.core.feature_guard import require_feature
 from app.accounts.dependencies import require_any_role, get_current_active_user
 from app.models.models import User, Class, AINote, Enrollment
 from app.ai_notes.schemas import (
@@ -28,7 +29,7 @@ router = APIRouter(prefix="/ai-notes", tags=["AI Notes"])
 async def generate_immersive_notes(
     data: GenerateRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_any_role)
+    current_user: User = Depends(require_feature("ai_notes"))
 ):
     """
     Generate immersive notes from raw lesson text.
@@ -96,7 +97,7 @@ async def generate_immersive_notes(
 async def save_immersive_notes(
     data: SaveNotesRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_any_role)
+    current_user: User = Depends(require_feature("ai_notes"))
 ):
     """
     Save generated immersive notes to the database.
@@ -173,7 +174,7 @@ async def save_immersive_notes(
 async def get_ai_notes(
     class_id: str = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_any_role)
+    current_user: User = Depends(require_feature("ai_notes"))
 ):
     """
     Get all AI notes.
@@ -232,7 +233,7 @@ async def get_ai_notes(
 async def get_ai_note(
     note_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_any_role)
+    current_user: User = Depends(require_feature("ai_notes"))
 ):
     """
     Get a specific AI note by ID.
@@ -308,7 +309,7 @@ async def get_ai_note(
 async def delete_ai_note(
     note_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_any_role)
+    current_user: User = Depends(require_feature("ai_notes"))
 ):
     """
     Delete an AI note.

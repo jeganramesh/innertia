@@ -23,7 +23,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useColleges } from '../../modules/platform/admin/hooks/useColleges';
 
 // Types
-type UserRole = 'student' | 'faculty' | 'admin' | 'college_admin' | 'staff' | 'trainer' | 'platform_admin';
+type UserRole = 'student' | 'faculty' | 'admin' | 'college_admin' | 'staff' | 'trainer';
 
 interface UserFormData {
   email: string;
@@ -31,6 +31,7 @@ interface UserFormData {
   role: UserRole;
   password?: string;
   is_active: boolean;
+  college_id?: string;
 }
 
 const initialFormData: UserFormData = {
@@ -38,7 +39,8 @@ const initialFormData: UserFormData = {
   name: '',
   role: 'student',
   password: '',
-  is_active: true
+  is_active: true,
+  college_id: undefined
 };
 
 export const UsersPage = () => {
@@ -113,6 +115,16 @@ export const UsersPage = () => {
     setPage(1);
   }, [roleFilter, collegeFilter, debouncedSearch]);
   
+  // Auto-select college if only one exists and role requires college
+  useEffect(() => {
+    const isAdmin = currentUser?.role === 'admin';
+    const requiresCollege = formData.role !== 'admin' && formData.role !== 'college_admin';
+    
+    if (colleges.length === 1 && isAdmin && requiresCollege) {
+      setFormData(prev => ({ ...prev, college_id: colleges[0].id }));
+    }
+  }, [colleges, currentUser, formData.role]);
+  
   // Calculate pagination
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   
@@ -137,12 +149,23 @@ export const UsersPage = () => {
         return;
       }
       
+      // Validate college_id for non-admin roles
+      const isAdmin = currentUser?.role === 'admin';
+      const requiresCollege = formData.role !== 'admin' && formData.role !== 'college_admin';
+      
+      if (isAdmin && requiresCollege && !formData.college_id) {
+        setFormError('Please select a college for this role');
+        setFormLoading(false);
+        return;
+      }
+      
       const userData: UserCreateAdmin = {
         email: formData.email,
         name: formData.name || undefined,
         role: formData.role,
         is_active: formData.is_active,
-        password: formData.password
+        password: formData.password,
+        college_id: formData.college_id
       };
       
       await adminApiService.createUser(userData);
@@ -242,7 +265,6 @@ export const UsersPage = () => {
   const getRoleBadge = (role: string) => {
     const colors: Record<string, string> = {
       admin: 'bg-red-100 text-red-700',
-      platform_admin: 'bg-red-100 text-red-700',
       college_admin: 'bg-orange-100 text-orange-700',
       faculty: 'bg-purple-100 text-purple-700',
       staff: 'bg-green-100 text-green-700',
@@ -331,7 +353,7 @@ export const UsersPage = () => {
             </select>
           </div>
           <div className="flex gap-2 flex-wrap">
-            {(['all', 'student', 'faculty', 'staff', 'trainer', 'college_admin', 'platform_admin'] as const).map((role) => (
+            {(['all', 'student', 'faculty', 'staff', 'trainer', 'college_admin', 'admin'] as const).map((role) => (
               <Button
                 key={role}
                 variant={roleFilter === role ? 'primary' : 'outline'}
@@ -339,7 +361,7 @@ export const UsersPage = () => {
                 className="h-11 px-4 rounded-xl text-sm"
                 onClick={() => setRoleFilter(role)}
               >
-                {role === 'all' ? 'All' : role === 'college_admin' ? 'College Admin' : role === 'platform_admin' ? 'Platform Admin' : role.charAt(0).toUpperCase() + role.slice(1)}
+                {role === 'all' ? 'All' : role === 'college_admin' ? 'College Admin' : role === 'admin' ? 'Admin' : role.charAt(0).toUpperCase() + role.slice(1)}
               </Button>
             ))}
           </div>
@@ -546,7 +568,7 @@ export const UsersPage = () => {
               <label className="text-sm font-medium">Role</label>
               <select
                 value={formData.role}
-                onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
+                onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole, college_id: undefined })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="student">Student</option>
@@ -555,9 +577,34 @@ export const UsersPage = () => {
                 <option value="trainer">Trainer</option>
                 <option value="college_admin">College Admin</option>
                 <option value="admin">Admin</option>
-                <option value="platform_admin">Platform Admin</option>
               </select>
             </div>
+            {/* College Dropdown - Show for non-admin roles when current user is admin */}
+            {currentUser?.role === 'admin' && formData.role !== 'admin' && formData.role !== 'college_admin' && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">College</label>
+                {colleges.length === 1 ? (
+                  <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                    <Building2 className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm font-medium">{colleges[0].name}</span>
+                    <input type="hidden" value={colleges[0].id} />
+                  </div>
+                ) : (
+                  <select
+                    value={formData.college_id || ''}
+                    onChange={(e) => setFormData({ ...formData, college_id: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Select College</option>
+                    {colleges?.map((college: any) => (
+                      <option key={college.id} value={college.id}>
+                        {college.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
             <div className="space-y-2">
               <label className="text-sm font-medium">Password</label>
               <Input
@@ -639,7 +686,6 @@ export const UsersPage = () => {
                 <option value="trainer">Trainer</option>
                 <option value="college_admin">College Admin</option>
                 <option value="admin">Admin</option>
-                <option value="platform_admin">Platform Admin</option>
               </select>
               {selectedUser?.id === currentUser?.id && (
                 <p className="text-xs text-gray-500">Cannot change your own role</p>

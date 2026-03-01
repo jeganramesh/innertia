@@ -1,6 +1,6 @@
 """
-Platform admin router.
-Handles platform-wide administrative operations for platform admins.
+Admin router.
+Handles platform-wide administrative operations for admins.
 """
 
 from typing import Optional, List
@@ -21,21 +21,21 @@ from app.modules.platform.admin.schemas import PlatformAnalyticsResponse
 
 
 router = APIRouter(
-    prefix="/platform-admin",
-    tags=["Platform Admin"]
+    prefix="/admin",
+    tags=["Admin"]
 )
 
 
 # =============================================================================
-# PLATFORM ADMIN DASHBOARD
+# ADMIN DASHBOARD
 # =============================================================================
 
 @router.get("/dashboard")
-async def platform_admin_dashboard(
-    current_user: User = Depends(require_roles("platform_admin")),
+async def admin_dashboard(
+    current_user: User = Depends(require_roles("admin")),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get platform admin dashboard data."""
+    """Get admin dashboard data."""
     
     # Get total colleges
     college_count_result = await db.execute(
@@ -56,14 +56,14 @@ async def platform_admin_dashboard(
         )
         user_counts[role] = result.scalar()
     
-    # Platform admin count
+    # Admin count
     admin_result = await db.execute(
         select(func.count(User.id)).where(
-            User.role == "platform_admin",
+            User.role == "admin",
             User.is_active == True
         )
     )
-    user_counts["platform_admin"] = admin_result.scalar()
+    user_counts["admin"] = admin_result.scalar()
     
     # Get total classes
     class_count_result = await db.execute(select(func.count(Class.id)))
@@ -78,7 +78,7 @@ async def platform_admin_dashboard(
     return {
         "stats": {
             "colleges": college_count,
-            "platform_admins": user_counts.get("platform_admin", 0),
+            "admins": user_counts.get("admin", 0),
             "college_admins": user_counts.get("college_admin", 0),
             "staff": user_counts.get("staff", 0),
             "faculty": user_counts.get("faculty", 0),
@@ -92,17 +92,17 @@ async def platform_admin_dashboard(
 
 
 # =============================================================================
-# COLLEGE MANAGEMENT (PLATFORM ADMIN)
+# COLLEGE MANAGEMENT (ADMIN)
 # =============================================================================
 
 @router.post("/colleges")
 async def create_college(
     name: str,
     code: str,
-    current_user: User = Depends(require_roles("platform_admin")),
+    current_user: User = Depends(require_roles("admin")),
     db: AsyncSession = Depends(get_db)
 ):
-    """Create a new college (platform admin only)."""
+    """Create a new college (admin only)."""
     
     # Check if college code exists
     existing = await db.execute(
@@ -138,10 +138,10 @@ async def list_colleges(
     limit: int = Query(100, ge=1, le=1000),
     is_active: Optional[bool] = None,
     search: Optional[str] = None,
-    current_user: User = Depends(require_roles("platform_admin")),
+    current_user: User = Depends(require_roles("admin")),
     db: AsyncSession = Depends(get_db)
 ):
-    """List all colleges (platform admin only)."""
+    """List all colleges (admin only)."""
     
     query = select(College)
     
@@ -188,10 +188,10 @@ async def update_college(
     college_id: UUID,
     name: Optional[str] = None,
     is_active: Optional[bool] = None,
-    current_user: User = Depends(require_roles("platform_admin")),
+    current_user: User = Depends(require_roles("admin")),
     db: AsyncSession = Depends(get_db)
 ):
-    """Update a college (platform admin only)."""
+    """Update a college (admin only)."""
     
     result = await db.execute(
         select(College).where(College.id == college_id)
@@ -222,38 +222,38 @@ async def update_college(
 
 
 # =============================================================================
-# USER MANAGEMENT (PLATFORM ADMIN)
+# USER MANAGEMENT (ADMIN)
 # =============================================================================
 
 @router.post("/users")
-async def create_platform_user(
+async def create_admin_user(
     email: str,
     password: str,
     full_name: Optional[str] = None,
     role: str = "college_admin",
     college_id: Optional[UUID] = None,
-    current_user: User = Depends(require_roles("platform_admin")),
+    current_user: User = Depends(require_roles("admin")),
     db: AsyncSession = Depends(get_db)
 ):
-    """Create a new platform or college user (platform admin only)."""
+    """Create a new platform or college user (admin only)."""
     
     # Validate role
-    valid_roles = ["platform_admin", "college_admin", "staff", "faculty", "trainer", "student"]
+    valid_roles = ["admin", "college_admin", "staff", "faculty", "trainer", "student"]
     if role not in valid_roles:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid role. Must be one of: {', '.join(valid_roles)}"
         )
     
-    # Platform admin can only be created by platform admin
-    if role == "platform_admin":
+    # Admin can only be created by admin
+    if role == "admin":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot create platform_admin users through this endpoint"
+            detail="Cannot create admin users through this endpoint"
         )
     
     # College-bound roles require college_id
-    if role != "platform_admin" and college_id is None:
+    if role != "admin" and college_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"college_id is required for role: {role}"
@@ -304,17 +304,17 @@ async def create_platform_user(
 
 
 @router.get("/users")
-async def list_platform_users(
+async def list_admin_users(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     role: Optional[str] = None,
     college_id: Optional[UUID] = None,
     is_active: Optional[bool] = None,
     search: Optional[str] = None,
-    current_user: User = Depends(require_roles("platform_admin")),
+    current_user: User = Depends(require_roles("admin")),
     db: AsyncSession = Depends(get_db)
 ):
-    """List all platform users (platform admin only)."""
+    """List all platform users (admin only)."""
     
     query = select(User).where(User.deleted_at.is_(None))
     
@@ -363,16 +363,16 @@ async def list_platform_users(
 
 
 @router.patch("/users/{user_id}")
-async def update_platform_user(
+async def update_admin_user(
     user_id: UUID,
     full_name: Optional[str] = None,
     role: Optional[str] = None,
     is_active: Optional[bool] = None,
     college_id: Optional[UUID] = None,
-    current_user: User = Depends(require_roles("platform_admin")),
+    current_user: User = Depends(require_roles("admin")),
     db: AsyncSession = Depends(get_db)
 ):
-    """Update a user (platform admin only)."""
+    """Update a user (admin only)."""
     
     result = await db.execute(
         select(User).where(User.id == user_id)
@@ -395,7 +395,7 @@ async def update_platform_user(
     if full_name is not None:
         user.full_name = full_name
     if role is not None:
-        valid_roles = ["platform_admin", "college_admin", "staff", "faculty", "trainer", "student"]
+        valid_roles = ["admin", "college_admin", "staff", "faculty", "trainer", "student"]
         if role not in valid_roles:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -422,7 +422,7 @@ async def update_platform_user(
 
 
 # =============================================================================
-# AUDIT LOGS (PLATFORM ADMIN)
+# AUDIT LOGS (ADMIN)
 # =============================================================================
 
 @router.get("/audit-logs")
@@ -432,10 +432,10 @@ async def list_audit_logs(
     action: Optional[str] = None,
     performed_by: Optional[UUID] = None,
     target_type: Optional[str] = None,
-    current_user: User = Depends(require_roles("platform_admin")),
+    current_user: User = Depends(require_roles("admin")),
     db: AsyncSession = Depends(get_db)
 ):
-    """List audit logs (platform admin only)."""
+    """List audit logs (admin only)."""
     
     query = select(AuditLog)
     
@@ -483,8 +483,8 @@ async def list_audit_logs(
 @router.get(
     "/analytics",
     response_model=PlatformAnalyticsResponse,
-    dependencies=[Depends(require_roles("platform_admin"))]
+    dependencies=[Depends(require_roles("admin"))]
 )
 async def get_platform_analytics(db: AsyncSession = Depends(get_db)):
-    """Get platform-wide analytics (platform admin only)."""
+    """Get platform-wide analytics (admin only)."""
     return await AnalyticsService.get_platform_analytics(db)

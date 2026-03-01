@@ -14,11 +14,7 @@ import {
 
 // Helper function to map role to dashboard route
 const getRoleBasedRoute = (role: string): string => {
-  const roleMap: Record<string, string> = {
-    'admin': 'platform_admin',
-  };
-  const normalizedRole = roleMap[role] || role;
-  return getRoleDashboard(normalizedRole);
+  return getRoleDashboard(role);
 };
 
 // Layouts
@@ -98,19 +94,11 @@ const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
     return <Navigate to="/login" replace />;
   }
   
-  // Map legacy roles to new roles for backwards compatibility
-  const roleMap: Record<string, string> = {
-    'admin': 'platform_admin',
-  };
-  
-  // Normalize role - convert legacy roles to new format
-  const normalizedRole = roleMap[user?.role || ''] || user?.role;
-  
   // If allowedRoles is specified, check user's role
   if (allowedRoles && user) {
-    if (!allowedRoles.includes(normalizedRole as UserRole)) {
+    if (!allowedRoles.includes(user.role as UserRole)) {
       // Redirect to their proper dashboard based on role
-      return <Navigate to={getRoleDashboard(normalizedRole)} replace />;
+      return <Navigate to={getRoleDashboard(user.role)} replace />;
     }
   }
   
@@ -199,15 +187,8 @@ const StudentRoutes = () => (
 
 // Route mapping based on role
 const getRoleRoutes = (role: string) => {
-  // Map legacy roles to new roles for backwards compatibility
-  const roleMap: Record<string, string> = {
-    'admin': 'platform_admin',
-  };
-  
-  const normalizedRole = roleMap[role] || role;
-  
-  switch (normalizedRole) {
-    case 'platform_admin':
+  switch (role) {
+    case 'admin':
       return <PlatformAdminRoutes />;
     case 'college_admin':
       return <CollegeAdminRoutes />;
@@ -238,11 +219,11 @@ export const AppRouter = () => {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/forbidden" element={<ForbiddenPage />} />
       
-      {/* Platform Admin Routes */}
+      {/* Admin Routes */}
       <Route 
-        path="/platform-admin/*" 
+        path="/admin/*" 
         element={
-          <ProtectedRoute allowedRoles={['platform_admin', 'admin']}>
+          <ProtectedRoute allowedRoles={['admin']}>
             <PlatformAdminRoutes />
           </ProtectedRoute>
         } 
@@ -300,9 +281,9 @@ export const AppRouter = () => {
       
       {/* Legacy route redirect - to be removed after migration */}
       <Route 
-        path="/admin/*" 
+        path="/platform-admin/*" 
         element={
-          <ProtectedRoute allowedRoles={['platform_admin', 'admin']}>
+          <ProtectedRoute allowedRoles={['admin']}>
             <PlatformAdminRoutes />
           </ProtectedRoute>
         } 

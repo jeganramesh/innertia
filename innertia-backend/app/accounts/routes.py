@@ -64,7 +64,7 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
     role = user_data.role or "student"
     
     # Validate role
-    valid_roles = ["student", "faculty", "admin", "platform_admin", "college_admin", "staff", "trainer"]
+    valid_roles = ["student", "faculty", "admin", "college_admin", "staff", "trainer"]
     if role not in valid_roles:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -319,11 +319,11 @@ async def get_user_features(
     Get enabled features for the current user's role and college.
     
     This endpoint provides the feature list for frontend dynamic navigation.
-    Platform admins see all features, other roles see only enabled features.
+    Admins see all features, other roles see only enabled features.
     """
     from app.core.feature_guard import FeatureGuard, PLATFORM_FEATURES
     
-    # If no college (should only be platform_admin), return all features
+    # If no college (should only be admin), return all features
     if not current_user.college_id:
         return {
             "features": PLATFORM_FEATURES,

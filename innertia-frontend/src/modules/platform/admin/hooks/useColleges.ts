@@ -45,10 +45,16 @@ export const useCreateCollege = () => {
 
   return useMutation({
     mutationFn: (data: CollegeCreatePayload) => collegeApi.createCollege(data),
-    onSuccess: () => {
+    onSuccess: (data) => {
       // Invalidate colleges list
       queryClient.invalidateQueries({ queryKey: collegeKeys.lists() });
-      toast.success('College created successfully');
+      
+      // Show success message with users added count if applicable
+      if (data.users_added_count && data.users_added_count > 0) {
+        toast.success(`College created successfully! ${data.users_added_count} user(s) have been added to the college.`);
+      } else {
+        toast.success('College created successfully');
+      }
     },
     onError: (error: any) => {
       const message = error.response?.data?.detail || 'Failed to create college';

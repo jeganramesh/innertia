@@ -40,7 +40,7 @@ export const CollegesPage = () => {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [newCollege, setNewCollege] = useState({ name: '', code: '', domain: '' });
+  const [newCollege, setNewCollege] = useState({ name: '', code: '', domain: '', add_existing_users: false });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -69,10 +69,17 @@ export const CollegesPage = () => {
 
     try {
       setIsSubmitting(true);
-      await createCollege(newCollege);
-      toast.success('College created successfully');
+      const result = await createCollege(newCollege);
+      
+      // Show success message with users count if applicable
+      if (result.users_added_count && result.users_added_count > 0) {
+        toast.success(`College created successfully! ${result.users_added_count} user(s) have been added to the college.`);
+      } else {
+        toast.success('College created successfully');
+      }
+      
       setIsCreateDialogOpen(false);
-      setNewCollege({ name: '', code: '', domain: '' });
+      setNewCollege({ name: '', code: '', domain: '', add_existing_users: false });
       loadColleges();
     } catch (error: any) {
       console.error('Failed to create college:', error);
@@ -104,7 +111,7 @@ export const CollegesPage = () => {
       <PageHeader
         title="Colleges"
         description="Manage colleges on the platform"
-        action={
+        actions={
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
               <Button>Add College</Button>
@@ -143,6 +150,20 @@ export const CollegesPage = () => {
                     onChange={(e) => setNewCollege({ ...newCollege, domain: e.target.value })}
                     placeholder="e.g., mit.edu"
                   />
+                </div>
+                
+                {/* Add existing users checkbox */}
+                <div className="flex items-center gap-2 py-2">
+                  <input
+                    type="checkbox"
+                    id="add_existing_users"
+                    checked={newCollege.add_existing_users}
+                    onChange={(e) => setNewCollege({ ...newCollege, add_existing_users: e.target.checked })}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <label htmlFor="add_existing_users" className="text-sm text-gray-700">
+                    Add all existing users to this college
+                  </label>
                 </div>
               </div>
               <DialogFooter>

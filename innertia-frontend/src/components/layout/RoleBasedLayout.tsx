@@ -9,7 +9,7 @@ import { useAuth } from '../../hooks/useAuth';
 
 interface RoleLayoutProps {
   children: ReactNode;
-  role: 'admin' | 'platform_admin' | 'faculty' | 'student';
+  role: 'admin' | 'faculty' | 'student';
 }
 
 const getStorageKey = (role: string) => `${role}-sidebar-collapsed`;
@@ -30,7 +30,6 @@ export const RoleBasedLayout = ({ children, role }: RoleLayoutProps) => {
   const getSidebar = () => {
     switch (role) {
       case 'admin':
-      case 'platform_admin':
         return <AdminSidebar onCollapseChange={setIsSidebarCollapsed} />;
       case 'faculty':
         return <FacultySidebar onCollapseChange={setIsSidebarCollapsed} />;

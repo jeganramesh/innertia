@@ -34,14 +34,14 @@ class RoleEnum(str, enum.Enum):
     """User role enumeration - enforced at DB level.
     
     Roles:
-    - platform_admin: System-wide administrator (SaaS owner)
+    - admin: System-wide administrator (SaaS owner)
     - college_admin: College-level administrator
     - staff: Non-teaching administrative staff
     - faculty: Teaching staff
     - trainer: Placement/assessment trainer
     - student: Enrolled students
     """
-    PLATFORM_ADMIN = "platform_admin"
+    ADMIN = "admin"
     COLLEGE_ADMIN = "college_admin"
     STAFF = "staff"
     FACULTY = "faculty"
@@ -61,6 +61,7 @@ class College(Base):
     - id: Primary key (UUID)
     - name: College name
     - code: Unique college code
+    - domain: College domain (optional)
     - is_active: Whether college is active
     - created_at: Creation timestamp
     - updated_at: Last update timestamp
@@ -79,6 +80,7 @@ class College(Base):
     # Core fields
     name = Column(String(255), nullable=False)
     code = Column(String(100), unique=True, nullable=False, index=True)
+    domain = Column(String(255), nullable=True)  # College domain for email/logo
     
     # Status
     is_active = Column(Boolean, default=True, nullable=False, index=True)
@@ -133,7 +135,7 @@ class User(Base):
     """
     Users table - stores all platform users.
     
-    Multi-tenant: platform_admin has NULL college_id, all others MUST have college_id.
+    Multi-tenant: admin has NULL college_id, all others MUST have college_id.
     """
     
     __tablename__ = "users"
@@ -142,7 +144,7 @@ class User(Base):
     # Primary key - UUID for SQLite/PostgreSQL compatibility
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     
-    # Multi-tenant: college reference (NULL for platform_admin)
+    # Multi-tenant: college reference (NULL for admin)
     college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.id"), nullable=True, index=True)
     
     # Core fields

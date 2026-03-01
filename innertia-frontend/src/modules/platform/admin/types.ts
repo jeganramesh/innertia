@@ -13,12 +13,14 @@ export interface College {
   created_at: string;
   updated_at: string;
   active_features_count?: number;
+  users_added_count?: number;  // Number of users added during creation
 }
 
 export interface CollegeCreatePayload {
   name: string;
   code: string;
   domain?: string;
+  add_existing_users?: boolean;  // If true, all users without a college will be added
 }
 
 export interface CollegeUpdatePayload {

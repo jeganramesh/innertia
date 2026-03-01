@@ -1,5 +1,6 @@
 """
-Platform admin sub-module.
+Platform admin module.
+Handles platform-level administrative operations.
 """
 
 from app.modules.platform.admin.service import AnalyticsService

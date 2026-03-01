@@ -6,7 +6,7 @@ export type FileType = 'ppt' | 'pdf' | 'docx' | 'xlsx';
 
 export type UploadStatus = 'uploading' | 'processing' | 'completed' | 'error' | 'queued';
 
-export type UserRole = 'platform_admin' | 'college_admin' | 'staff' | 'faculty' | 'trainer' | 'student' | 'admin';
+export type UserRole = 'admin' | 'college_admin' | 'staff' | 'faculty' | 'trainer' | 'student';
 
 export interface User {
   id: string;

@@ -119,6 +119,7 @@ export interface College {
   created_at: string;
   updated_at: string;
   active_features_count?: number;
+  users_added_count?: number;  // Number of users added during creation
 }
 
 export interface CollegeFeature {
@@ -161,7 +162,7 @@ export const fetchCollege = async (collegeId: string) => {
 };
 
 // Create college
-export const createCollege = async (collegeData: { name: string; code: string; domain?: string }) => {
+export const createCollege = async (collegeData: { name: string; code: string; domain?: string; add_existing_users?: boolean }) => {
   const response = await adminApi.post<College>('/platform/admin/colleges', collegeData);
   return response.data;
 };

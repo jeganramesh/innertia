@@ -59,8 +59,8 @@ class FeatureGuard:
         if self._college_features is not None:
             return self._college_features
         
-        # Platform admin bypasses all feature checks
-        if self.current_user.role == RoleEnum.PLATFORM_ADMIN.value:
+        # Admin bypasses all feature checks
+        if self.current_user.role == RoleEnum.ADMIN.value:
             return {feature: True for feature in PLATFORM_FEATURES}
         
         # Non-platform admins must have a college
@@ -86,8 +86,8 @@ class FeatureGuard:
         if self._role_permissions is not None:
             return self._role_permissions
         
-        # Platform admin bypasses all permission checks
-        if self.current_user.role == RoleEnum.PLATFORM_ADMIN.value:
+        # Admin bypasses all permission checks
+        if self.current_user.role == RoleEnum.ADMIN.value:
             return {feature: True for feature in PLATFORM_FEATURES}
         
         # Non-platform admins must have a college
@@ -116,8 +116,8 @@ class FeatureGuard:
         Returns True if access is granted.
         Raises HTTPException(403) if access is denied.
         """
-        # Platform admin bypass
-        if self.current_user.role == RoleEnum.PLATFORM_ADMIN.value:
+        # Admin bypass
+        if self.current_user.role == RoleEnum.ADMIN.value:
             return True
         
         # Check college-level feature
@@ -213,8 +213,8 @@ def require_any_feature(feature_keys: List[str]):
     ):
         guard = FeatureGuard(db, current_user)
         
-        # Platform admin bypass
-        if current_user.role == RoleEnum.PLATFORM_ADMIN.value:
+        # Admin bypass
+        if current_user.role == RoleEnum.ADMIN.value:
             return
         
         has_any = False
@@ -247,7 +247,7 @@ def require_role(allowed_roles: List[str]):
         @router.delete("/users/{user_id}")
         async def delete_user(
             user_id: str,
-            _ = Depends(require_role(["platform_admin", "college_admin"]))
+            _ = Depends(require_role(["admin", "college_admin"]))
         ):
             ...
     """
@@ -270,7 +270,7 @@ def require_role(allowed_roles: List[str]):
 
 
 # Pre-defined role dependencies for common use cases
-require_platform_admin = require_role([RoleEnum.PLATFORM_ADMIN.value])
+require_admin = require_role([RoleEnum.ADMIN.value])
 require_college_admin = require_role([RoleEnum.COLLEGE_ADMIN.value])
 require_faculty = require_role([RoleEnum.FACULTY.value])
 require_staff = require_role([RoleEnum.STAFF.value])
@@ -278,5 +278,5 @@ require_trainer = require_role([RoleEnum.TRAINER.value])
 require_student = require_role([RoleEnum.STUDENT.value])
 
 # Convenience combinations
-require_admin_or_college_admin = require_role([RoleEnum.PLATFORM_ADMIN.value, RoleEnum.COLLEGE_ADMIN.value])
+require_admin_or_college_admin = require_role([RoleEnum.ADMIN.value, RoleEnum.COLLEGE_ADMIN.value])
 require_teaching_staff = require_role([RoleEnum.FACULTY.value, RoleEnum.TRAINER.value])

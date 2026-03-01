@@ -29,22 +29,19 @@ class Role(str, Enum):
     """User role enumeration for the platform.
     
     Hierarchy:
-    - platform_admin: System-wide administrator (SaaS owner)
+    - admin: System-wide administrator (SaaS owner)
     - college_admin: College-level administrator
     - staff: Non-teaching administrative staff
     - faculty: Teaching staff
     - trainer: Placement/assessment trainer
     - student: Enrolled students
     """
-    PLATFORM_ADMIN = "platform_admin"
+    ADMIN = "admin"
     COLLEGE_ADMIN = "college_admin"
     STAFF = "staff"
     FACULTY = "faculty"
     TRAINER = "trainer"
     STUDENT = "student"
-    
-    # Aliases for backward compatibility
-    ADMIN = "platform_admin"
 
 
 class Resource(str, Enum):
@@ -77,7 +74,7 @@ class Action(str, Enum):
 
 # Role -> Resource -> Allowed Actions
 PERMISSION_MATRIX: dict[str, dict[str, list[str]]] = {
-    Role.PLATFORM_ADMIN.value: {
+    Role.ADMIN.value: {
         Resource.COLLEGES: [Action.CREATE, Action.READ, Action.UPDATE, Action.DELETE],
         Resource.USERS: [Action.CREATE, Action.READ, Action.UPDATE, Action.DELETE],
         Resource.CLASSES: [Action.READ],
@@ -182,7 +179,7 @@ def require_roles(*allowed_roles: str):
     
     Usage:
         @router.get("/admin-only")
-        async def admin_endpoint(user=Depends(require_roles("platform_admin"))):
+        async def admin_endpoint(user=Depends(require_roles("admin"))):
             ...
     
     Args:
@@ -192,7 +189,10 @@ def require_roles(*allowed_roles: str):
         HTTPException 403: If user's role is not in allowed_roles
     """
     async def role_checker(current_user: User = Depends(get_current_user)):
-        if current_user.role not in allowed_roles:
+        # For backward compatibility, treat "admin" role as is
+        user_role = current_user.role
+        
+        if user_role not in allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Access denied. Required roles: {', '.join(allowed_roles)}"
@@ -247,7 +247,7 @@ def get_current_user():
 async def verify_college_access(
     current_user: User,
     resource_college_id: Optional[UUID],
-    allow_platform_admin: bool = True
+    allow_admin: bool = True
 ) -> None:
     """
     Verify that a user has access to a resource based on college isolation.
@@ -255,13 +255,13 @@ async def verify_college_access(
     Args:
         current_user: The authenticated user
         resource_college_id: The college_id of the resource being accessed
-        allow_platform_admin: Whether platform_admin can access any college's data
+        allow_admin: Whether admin can access any college's data
         
     Raises:
         HTTPException 403: If access is denied
     """
-    # Platform admin can access any college's data
-    if allow_platform_admin and current_user.role == Role.PLATFORM_ADMIN.value:
+    # Admin can access any college's data
+    if allow_admin and current_user.role == Role.ADMIN.value:
         return
     
     # Non-platform admins must have a college_id
@@ -295,8 +295,8 @@ async def filter_by_college(query, model, current_user: User, db: AsyncSession):
     Returns:
         Filtered query
     """
-    # Platform admin can see all
-    if current_user.role == Role.PLATFORM_ADMIN.value:
+    # Admin can see all
+    if current_user.role == Role.ADMIN.value:
         return query
     
     # Others must have college_id and are restricted to their college
@@ -334,8 +334,8 @@ async def verify_ownership(
     if allow_college_admin and current_user.role == Role.COLLEGE_ADMIN.value:
         return
     
-    # Platform admin can manage everything
-    if current_user.role == Role.PLATFORM_ADMIN.value:
+    # Admin can manage everything
+    if current_user.role == Role.ADMIN.value:
         return
     
     raise HTTPException(
@@ -348,9 +348,9 @@ async def verify_ownership(
 # ROLE CHECKERS
 # =============================================================================
 
-def is_platform_admin(user: User) -> bool:
-    """Check if user is a platform admin."""
-    return user.role == Role.PLATFORM_ADMIN.value
+def is_admin(user: User) -> bool:
+    """Check if user is an admin."""
+    return user.role == Role.ADMIN.value
 
 
 def is_college_admin(user: User) -> bool:
@@ -379,8 +379,8 @@ def is_staff(user: User) -> bool:
 
 
 def is_admin_or_college_admin(user: User) -> bool:
-    """Check if user is platform admin or college admin."""
-    return user.role in [Role.PLATFORM_ADMIN.value, Role.COLLEGE_ADMIN.value]
+    """Check if user is admin or college admin."""
+    return user.role in [Role.ADMIN.value, Role.COLLEGE_ADMIN.value]
 
 
 # =============================================================================
@@ -398,15 +398,15 @@ def validate_college_assignment(user: User, college_id: Optional[UUID]) -> None:
     Raises:
         HTTPException 400: If assignment is invalid
     """
-    # Platform admin should NOT have a college_id
-    if user.role == Role.PLATFORM_ADMIN.value and college_id is not None:
+    # Admin should NOT have a college_id
+    if user.role == Role.ADMIN.value and college_id is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Platform admin should not be assigned to a college."
+            detail="Admin should not be assigned to a college."
         )
     
     # All other roles MUST have a college_id
-    if user.role != Role.PLATFORM_ADMIN.value and college_id is None:
+    if user.role != Role.ADMIN.value and college_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"User with role '{user.role}' must be assigned to a college."

@@ -33,6 +33,7 @@ export const CollegeFormModal = ({ isOpen, onClose, college }: CollegeFormModalP
     name: college?.name || '',
     code: college?.code || '',
     domain: college?.domain || '',
+    add_existing_users: false,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -57,13 +58,17 @@ export const CollegeFormModal = ({ isOpen, onClose, college }: CollegeFormModalP
       if (isEditing) {
         await updateMutation.mutateAsync({
           collegeId: college.id,
-          data: formData,
+          data: {
+            name: formData.name,
+            code: formData.code,
+            domain: formData.domain,
+          },
         });
       } else {
         await createMutation.mutateAsync(formData as CollegeCreatePayload);
       }
       onClose();
-      setFormData({ name: '', code: '', domain: '' });
+      setFormData({ name: '', code: '', domain: '', add_existing_users: false });
     } catch (error) {
       // Error handled by mutations
     }
@@ -113,6 +118,22 @@ export const CollegeFormModal = ({ isOpen, onClose, college }: CollegeFormModalP
               placeholder="e.g., mit.edu"
             />
           </div>
+
+          {/* Only show this option when creating a new college */}
+          {!isEditing && (
+            <div className="flex items-center gap-2 py-2">
+              <input
+                type="checkbox"
+                id="add_existing_users"
+                checked={formData.add_existing_users}
+                onChange={(e) => setFormData({ ...formData, add_existing_users: e.target.checked })}
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <label htmlFor="add_existing_users" className="text-sm text-gray-700">
+                Add all existing users to this college
+              </label>
+            </div>
+          )}
         </div>
         
         <DialogFooter>

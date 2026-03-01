@@ -12,7 +12,7 @@ const API_V1_PREFIX = '/api/v1';
 const ACCOUNTS_PREFIX = '/accounts';  // Backend uses /accounts (plural)
 
 // Types
-export type UserRole = 'platform_admin' | 'college_admin' | 'staff' | 'faculty' | 'trainer' | 'student' | 'admin';
+export type UserRole = 'admin' | 'college_admin' | 'staff' | 'faculty' | 'trainer' | 'student';
 
 export interface LoginInput {
   email: string;
@@ -130,7 +130,6 @@ const TEST_CREDENTIALS = {
   student: { email: 'student@test.com', password: 'student123', role: 'student' as const, full_name: 'Test Student' },
   faculty: { email: 'faculty@test.com', password: 'faculty123', role: 'faculty' as const, full_name: 'Test Faculty' },
   admin: { email: 'admin@test.com', password: 'admin123', role: 'admin' as const, full_name: 'Test Admin' },
-  platform_admin: { email: 'platform@test.com', password: 'platform123', role: 'platform_admin' as const, full_name: 'Platform Admin' },
   college_admin: { email: 'college@test.com', password: 'college123', role: 'college_admin' as const, full_name: 'College Admin' },
   staff: { email: 'staff@test.com', password: 'staff123', role: 'staff' as const, full_name: 'Test Staff' },
   trainer: { email: 'trainer@test.com', password: 'trainer123', role: 'trainer' as const, full_name: 'Test Trainer' }
@@ -296,12 +295,10 @@ export const authService = {
    */
   getRoleBasedRoute(role: string): string {
     switch (role) {
-      case 'platform_admin':
-        return '/platform-admin/dashboard';
+      case 'admin':
+        return '/admin/dashboard';
       case 'college_admin':
         return '/college-admin/dashboard';
-      case 'admin':
-        return '/platform-admin/dashboard';
       case 'faculty':
         return '/faculty/dashboard';
       case 'student':

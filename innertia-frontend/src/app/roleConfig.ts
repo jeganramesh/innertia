@@ -4,7 +4,7 @@
  */
 
 export type UserRole = 
-  | 'platform_admin'
+  | 'admin'
   | 'college_admin'
   | 'staff'
   | 'faculty'
@@ -19,10 +19,10 @@ export interface RoleConfig {
 }
 
 export const ROLE_CONFIG: Record<UserRole, RoleConfig> = {
-  platform_admin: {
-    role: 'platform_admin',
-    label: 'Platform Admin',
-    routePrefix: '/platform-admin',
+  admin: {
+    role: 'admin',
+    label: 'Admin',
+    routePrefix: '/admin',
     description: 'Full system control'
   },
   college_admin: {
@@ -58,7 +58,7 @@ export const ROLE_CONFIG: Record<UserRole, RoleConfig> = {
 };
 
 // Platform roles (can manage multiple colleges)
-export const PLATFORM_ROLES: UserRole[] = ['platform_admin'];
+export const PLATFORM_ROLES: UserRole[] = ['admin'];
 
 // College-level roles (belong to a single college)
 export const COLLEGE_ROLES: UserRole[] = [
@@ -70,7 +70,7 @@ export const COLLEGE_ROLES: UserRole[] = [
 ];
 
 // Admin roles (can manage users)
-export const ADMIN_ROLES: UserRole[] = ['platform_admin', 'college_admin'];
+export const ADMIN_ROLES: UserRole[] = ['admin', 'college_admin'];
 
 // Teaching roles
 export const TEACHING_ROLES: UserRole[] = ['faculty', 'trainer'];
@@ -81,8 +81,9 @@ export const ROLE_HIERARCHY: UserRole[] = [
   'trainer',
   'faculty',
   'staff',
+  'staff',
   'college_admin',
-  'platform_admin'
+  'admin'
 ];
 
 /**

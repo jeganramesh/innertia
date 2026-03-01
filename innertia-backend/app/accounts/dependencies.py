@@ -158,10 +158,10 @@ def require_roles(allowed_roles: List[str]):
 
 
 # Convenience dependencies for common role combinations
-require_admin = require_roles(["admin", "platform_admin"])
-require_faculty_or_admin = require_roles(["faculty", "admin", "platform_admin", "college_admin"])
-require_student_or_admin = require_roles(["student", "admin", "platform_admin"])
-require_any_role = require_roles(["student", "faculty", "admin", "platform_admin", "college_admin", "staff", "trainer"])
+require_admin = require_roles(["admin"])
+require_faculty_or_admin = require_roles(["faculty", "admin", "college_admin"])
+require_student_or_admin = require_roles(["student", "admin"])
+require_any_role = require_roles(["student", "faculty", "admin", "college_admin", "staff", "trainer"])
 
 
 async def get_user_by_email(
