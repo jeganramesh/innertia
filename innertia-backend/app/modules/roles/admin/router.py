@@ -7,7 +7,7 @@ from typing import Optional, List
 from uuid import UUID
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_
 
@@ -264,11 +264,11 @@ async def update_college(
 
 @router.post("/users")
 async def create_admin_user(
-    email: str,
-    password: str,
-    full_name: Optional[str] = None,
-    role: str = "college_admin",
-    college_id: Optional[UUID] = None,
+    email: str = Form(...),
+    password: str = Form(...),
+    full_name: Optional[str] = Form(None),
+    role: str = Form("college_admin"),
+    college_id: Optional[UUID] = Form(None),
     current_user: User = Depends(require_roles("admin")),
     db: AsyncSession = Depends(get_db)
 ):

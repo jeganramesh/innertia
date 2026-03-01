@@ -4,8 +4,9 @@ Pydantic models for college admin role requests and responses.
 """
 
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from uuid import UUID
+from datetime import datetime
 
 
 # =============================================================================
@@ -38,6 +39,30 @@ class CollegeAdminDashboardResponse(BaseModel):
 # =============================================================================
 # USERS
 # =============================================================================
+
+class UserCreateRequest(BaseModel):
+    """Request to create a user in the college."""
+    email: str = Field(..., description="User email address")
+    name: Optional[str] = Field(None, description="User full name")
+    password: str = Field(..., min_length=8, max_length=128, description="User password")
+    role: str = Field(..., description="User role (staff, faculty, trainer, student)")
+    is_active: bool = Field(True, description="Whether user is active")
+
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "email": "john.doe@college.edu",
+            "name": "John Doe",
+            "password": "securepass123",
+            "role": "student",
+            "is_active": True
+        }
+    })
+
+
+class UserBulkCreateRequest(BaseModel):
+    """Request to bulk create users in the college."""
+    users: List[UserCreateRequest] = Field(..., description="List of users to create")
+
 
 class UserResponse(BaseModel):
     """User response model."""
@@ -156,3 +181,49 @@ class RoleFeaturePermissionListResponse(BaseModel):
     """List of role feature permissions."""
     items: List[RoleFeaturePermissionResponse]
     total: int
+
+
+# =============================================================================
+# AUDIT LOGS
+# =============================================================================
+
+class AuditLogResponse(BaseModel):
+    """Audit log response model."""
+    id: str
+    action: str
+    target_type: Optional[str] = None
+    target_id: Optional[str] = None
+    metadata_json: Optional[str] = None
+    ip_address: Optional[str] = None
+    created_at: datetime
+    performed_by: str
+    performed_by_name: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AuditLogListResponse(BaseModel):
+    """Paginated list of audit logs."""
+    items: List[AuditLogResponse]
+    total: int
+    page: int
+    page_size: int
+    pages: int
+
+
+# =============================================================================
+# BULK UPLOAD
+# =============================================================================
+
+class BulkUploadFailedRow(BaseModel):
+    """Failed row in bulk upload."""
+    row: int
+    email: str
+    error: str
+
+
+class BulkUploadResponse(BaseModel):
+    """Response for bulk user upload."""
+    created_count: int
+    updated_count: int
+    failed_rows: List[BulkUploadFailedRow]

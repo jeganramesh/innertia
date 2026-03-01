@@ -119,7 +119,7 @@ export const UsersPage = () => {
   // Auto-select college if only one exists and role requires college
   useEffect(() => {
     const isAdmin = currentUser?.role === 'admin';
-    const requiresCollege = formData.role !== 'admin' && formData.role !== 'college_admin';
+    const requiresCollege = formData.role !== 'admin';
     
     if (colleges.length === 1 && isAdmin && requiresCollege) {
       setFormData(prev => ({ ...prev, college_id: colleges[0].id }));
@@ -155,9 +155,9 @@ export const UsersPage = () => {
         return;
       }
       
-      // Validate college_id for non-admin roles
+      // Validate college_id for non-admin roles (college_admin also needs a college!)
       const isAdmin = currentUser?.role === 'admin';
-      const requiresCollege = formData.role !== 'admin' && formData.role !== 'college_admin';
+      const requiresCollege = formData.role !== 'admin';
       
       if (isAdmin && requiresCollege && !formData.college_id) {
         setFormError('Please select a college for this role');
@@ -260,7 +260,8 @@ export const UsersPage = () => {
       email: user.email,
       name: user.full_name || user.name || '',
       role: (user.role as UserRole) || 'student',
-      is_active: user.is_active
+      is_active: user.is_active,
+      college_id: user.college_id ? String(user.college_id) : undefined
     });
     setFormError(null);
     setShowEditModal(true);
@@ -589,7 +590,15 @@ export const UsersPage = () => {
               <label className="text-sm font-medium">Role</label>
               <select
                 value={formData.role}
-                onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole, college_id: undefined })}
+                onChange={(e) => {
+                  const newRole = e.target.value as UserRole;
+                  // Only clear college_id if switching to admin (admin doesn't need college)
+                  setFormData({
+                    ...formData,
+                    role: newRole,
+                    college_id: newRole === 'admin' ? undefined : formData.college_id
+                  });
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="student">Student</option>
@@ -600,8 +609,8 @@ export const UsersPage = () => {
                 <option value="admin">Admin</option>
               </select>
             </div>
-            {/* College Dropdown - Show for non-admin roles when current user is admin */}
-            {currentUser?.role === 'admin' && formData.role !== 'admin' && formData.role !== 'college_admin' && (
+            {/* College Dropdown - Show for non-admin roles (including college_admin) when current user is admin */}
+            {currentUser?.role === 'admin' && formData.role !== 'admin' && (
               <div className="space-y-2">
                 <label className="text-sm font-medium">College</label>
                 {colleges.length === 1 ? (
@@ -712,6 +721,31 @@ export const UsersPage = () => {
                 <p className="text-xs text-gray-500">Cannot change your own role</p>
               )}
             </div>
+            {/* College Dropdown - Show for non-admin roles when current user is admin */}
+            {currentUser?.role === 'admin' && formData.role !== 'admin' && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">College</label>
+                {colleges.length === 1 ? (
+                  <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                    <Building2 className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm font-medium">{colleges[0].name}</span>
+                  </div>
+                ) : (
+                  <select
+                    value={formData.college_id || ''}
+                    onChange={(e) => setFormData({ ...formData, college_id: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Select College</option>
+                    {colleges?.map((college: any) => (
+                      <option key={college.id} value={college.id}>
+                        {college.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"

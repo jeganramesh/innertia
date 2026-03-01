@@ -43,7 +43,12 @@ import {
 import { CollegeAdminDashboard } from '../pages/college_admin/CollegeAdminDashboard';
 import { CollegeUsersPage } from '../pages/college_admin/CollegeUsersPage';
 import { CollegeClassesPage } from '../pages/college_admin/CollegeClassesPage';
+import { CollegeSessionsPage } from '../pages/college_admin/CollegeSessionsPage';
+import { CollegeReportsPage } from '../pages/college_admin/CollegeReportsPage';
+import { CollegeSettingsPage } from '../pages/college_admin/CollegeSettingsPage';
 import { RoleFeaturesPage } from '../pages/college_admin/RoleFeaturesPage';
+import { CollegeAuditLogsPage } from '../pages/college_admin/CollegeAuditLogsPage';
+import { CollegeUserBulkUpload } from '../pages/college_admin/CollegeUserBulkUpload';
 
 // Staff Pages
 import { StaffDashboard } from '../pages/staff/StaffDashboard';
@@ -133,7 +138,12 @@ const CollegeAdminRoutes = () => (
       <Route path="dashboard" element={<CollegeAdminDashboard />} />
       <Route path="users" element={<CollegeUsersPage />} />
       <Route path="classes" element={<CollegeClassesPage />} />
+      <Route path="sessions" element={<CollegeSessionsPage />} />
+      <Route path="reports" element={<CollegeReportsPage />} />
+      <Route path="settings" element={<CollegeSettingsPage />} />
       <Route path="role-features" element={<RoleFeaturesPage />} />
+      <Route path="audit-logs" element={<CollegeAuditLogsPage />} />
+      <Route path="users/bulk-upload" element={<CollegeUserBulkUpload />} />
     </Routes>
   </AdminLayout>
 );

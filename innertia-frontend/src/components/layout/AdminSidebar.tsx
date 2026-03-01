@@ -146,8 +146,10 @@ export const AdminSidebar = memo(({ className, onCollapseChange }: AdminSidebarP
   const collegeAdminNavItems: NavItem[] = [
     { icon: <Home size={20} />, label: 'Dashboard', path: '/college-admin/dashboard' },
     { icon: <Users size={20} />, label: 'Users', path: '/college-admin/users' },
+    { icon: <Upload size={20} />, label: 'Bulk Upload', path: '/college-admin/users/bulk-upload' },
     { icon: <BookOpen size={20} />, label: 'Classes', path: '/college-admin/classes' },
     { icon: <Shield size={20} />, label: 'Role Features', path: '/college-admin/role-features' },
+    { icon: <FileText size={20} />, label: 'Audit Logs', path: '/college-admin/audit-logs' },
   ];
 
   const dashboardItems = navItems.slice(0, 4);

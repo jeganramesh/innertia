@@ -85,6 +85,9 @@ class College(Base):
     # Status
     is_active = Column(Boolean, default=True, nullable=False, index=True)
     
+    # College settings (JSON)
+    settings = Column(JSON, nullable=True, default=dict)
+    
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

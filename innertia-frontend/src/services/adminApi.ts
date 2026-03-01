@@ -211,6 +211,14 @@ export const adminApiService = {
     formData.append('role', data.role);
     if (data.college_id) formData.append('college_id', data.college_id);
     
+    // Debug logging
+    console.log('Creating user with data:', {
+      email: data.email,
+      role: data.role,
+      college_id: data.college_id,
+      formData: formData.toString()
+    });
+    
     const response = await adminApi.post<UserOutAdmin>('/admin/users', formData.toString(), {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
     });
