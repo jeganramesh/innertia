@@ -26,6 +26,7 @@ export interface User {
   name?: string;
   role: UserRole;
   college_id?: string | null;
+  college_is_active?: boolean | null;
   is_active: boolean;
   is_verified?: boolean;
   created_at?: string;
@@ -175,6 +176,11 @@ export const authService = {
       if (error.response?.status === 401) {
         throw new Error('Invalid email or password');
       } else if (error.response?.status === 403) {
+        // Check if it's a college inactive error
+        const detail = error.response?.data?.detail || '';
+        if (detail.includes('College is inactive')) {
+          throw new Error('Your college is inactive. Please contact the platform admin.');
+        }
         throw new Error('Account is inactive or not verified');
       } else if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
         throw new Error('Cannot connect to server. Please check if the backend is running.');

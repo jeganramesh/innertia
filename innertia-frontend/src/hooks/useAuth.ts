@@ -26,6 +26,26 @@ export const useAuth = (): UseAuthReturn => {
   const navigate = useNavigate();
   const location = useLocation();
   
+  // Check if user's college is inactive and handle it
+  const checkCollegeActive = useCallback((user: User) => {
+    // Platform admin (role=admin) doesn't have a college
+    if (user.role === 'admin') {
+      return true;
+    }
+    
+    // If user has no college, allow access
+    if (!user.college_id) {
+      return true;
+    }
+    
+    // Check if college is active
+    if (user.college_is_active === false) {
+      return false;
+    }
+    
+    return true;
+  }, []);
+
   // Initialize auth state from storage
   useEffect(() => {
     const initAuth = async () => {
@@ -34,10 +54,35 @@ export const useAuth = (): UseAuthReturn => {
           // Try to get user from storage first
           const storedUser = authService.getStoredUser();
           if (storedUser) {
+            // Check if college is inactive
+            if (!checkCollegeActive(storedUser)) {
+              // Clear auth state and redirect to login with message
+              await authService.logout();
+              navigate('/login', { 
+                replace: true,
+                state: { 
+                  from: location,
+                  message: 'Your college is inactive. Contact platform admin.' 
+                } 
+              });
+              return;
+            }
             setUser(storedUser);
           } else {
             // Fetch user from API
             const currentUser = await authService.getCurrentUser();
+            // Check if college is inactive
+            if (!checkCollegeActive(currentUser)) {
+              await authService.logout();
+              navigate('/login', { 
+                replace: true,
+                state: { 
+                  from: location,
+                  message: 'Your college is inactive. Contact platform admin.' 
+                } 
+              });
+              return;
+            }
             setUser(currentUser);
             authService.storeUser(currentUser);
           }
@@ -54,7 +99,7 @@ export const useAuth = (): UseAuthReturn => {
     };
     
     initAuth();
-  }, []);
+  }, [navigate, location, checkCollegeActive]);
   
   // Login
   const login = useCallback(async (credentials: LoginInput) => {
@@ -64,6 +109,20 @@ export const useAuth = (): UseAuthReturn => {
     try {
       const response: AuthResponse = await authService.login(credentials);
       console.log('Login response:', response);
+      
+      // Check if user's college is inactive
+      if (response.user.role !== 'admin' && 
+          response.user.college_id && 
+          response.user.college_is_active === false) {
+        // Clear tokens but don't set user - redirect to login with message
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('token_type');
+        const message = 'Your college is inactive. Contact platform admin.';
+        setError(message);
+        throw new Error(message);
+      }
+      
       setUser(response.user);
       authService.storeUser(response.user);
       
@@ -81,7 +140,7 @@ export const useAuth = (): UseAuthReturn => {
     } finally {
       setIsLoading(false);
     }
-  }, [navigate, location]);
+  }, [navigate, location, checkCollegeActive]);
   
   // Logout
   const logout = useCallback(async () => {

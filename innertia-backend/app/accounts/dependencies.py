@@ -12,6 +12,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.redis import redis_client
@@ -130,16 +131,65 @@ async def get_current_active_user(
     return current_user
 
 
-def require_roles(allowed_roles: List[str]):
+async def verify_college_active(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+) -> User:
+    """
+    Dependency to verify that the user's college is active.
+    
+    Platform admins (role='admin') are exempt from this check.
+    Users without a college_id are also exempt.
+    
+    Args:
+        current_user: Current authenticated user
+        db: Database session
+        
+    Returns:
+        User if college is active
+        
+    Raises:
+        HTTPException: If user's college is inactive
+    """
+    # Platform admins are exempt
+    if current_user.role and str(current_user.role).lower() == "admin":
+        return current_user
+    
+    # Users without college are exempt
+    if not current_user.college_id:
+        return current_user
+    
+    # Load college relationship if user has college_id
+    if current_user.college_id:
+        result = await db.execute(
+            select(User).options(selectinload(User.college)).where(User.id == current_user.id)
+        )
+        current_user = result.scalar_one()
+    
+    # Check if college is active
+    if current_user.college and not current_user.college.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="College is inactive. Contact platform admin."
+        )
+    
+    return current_user
+
+
+def require_roles(allowed_roles):
     """
     Factory function to create role-based access control dependency.
     
     Args:
-        allowed_roles: List of role names that are allowed
+        allowed_roles: List of role names that are allowed, or a single role string
         
     Returns:
         Dependency function
     """
+    # Handle case where a single string is passed instead of a list
+    if isinstance(allowed_roles, str):
+        allowed_roles = [allowed_roles]
+    
     async def role_checker(
         current_user: User = Depends(get_current_active_user)
     ) -> User:
@@ -197,13 +247,25 @@ def create_user_response(user: User) -> dict:
     # Convert role to lowercase for frontend compatibility
     user_role = str(user.role).lower() if user.role else ""
     
+    # Get college_id directly from the user (no lazy loading)
+    college_id = user.college_id
+    
+    # Check if college relationship is already loaded
+    # Use object.__getattribute__ to avoid triggering lazy load
+    try:
+        college = object.__getattribute__(user, 'college')
+        college_is_active = college.is_active if college else None
+    except AttributeError:
+        college_is_active = None
+    
     return {
         "id": str(user.id),
         "email": user.email,
         "name": user.name or user.full_name or "",
         "full_name": user.full_name or user.name or "",
         "role": user_role,
-        "college_id": str(user.college_id) if user.college_id else None,
+        "college_id": str(college_id) if college_id else None,
+        "college_is_active": college_is_active,
         "is_active": user.is_active,
         "is_verified": user.is_verified,
         "created_at": user.created_at,

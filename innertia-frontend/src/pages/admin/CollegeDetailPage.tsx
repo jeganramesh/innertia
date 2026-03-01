@@ -12,13 +12,15 @@ import {
   fetchCollegeUsers,
   fetchRoleFeatures,
   toggleRoleFeature,
+  updateCollege,
+  updateUser,
   College,
   CollegeFeature,
   RoleFeaturePermission
 } from '../../modules/admin/api';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Badge } from '../../components/ui/Badge';
+import { Badge, CollegeStatusBadge } from '../../components/ui/Badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { 
   Table, 
@@ -58,6 +60,8 @@ export const CollegeDetailPage = () => {
   const [usersLoading, setUsersLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'features' | 'role-features' | 'users'>('features');
   const [userPage, setUserPage] = useState(1);
+  const [isTogglingStatus, setIsTogglingStatus] = useState(false);
+  const [hasCollegeAdmin, setHasCollegeAdmin] = useState(true);
 
   useEffect(() => {
     if (collegeId) {
@@ -96,6 +100,10 @@ export const CollegeDetailPage = () => {
       setUsersLoading(true);
       const response = await fetchCollegeUsers(collegeId!, userPage, 20);
       setUsers(response.items || []);
+      
+      // Check if any user is a college admin
+      const hasAdmin = (response.items || []).some((user: any) => user.role === 'college_admin' && user.is_active);
+      setHasCollegeAdmin(hasAdmin);
     } catch (error) {
       console.error('Failed to load users:', error);
       toast.error('Failed to load users');
@@ -126,6 +134,44 @@ export const CollegeDetailPage = () => {
     }
   };
 
+  const handleMakeAdmin = async (userId: string) => {
+    try {
+      await updateUser(userId, { role: 'college_admin' });
+      toast.success('User promoted to college admin');
+      loadUsers();
+    } catch (error: any) {
+      console.error('Failed to make admin:', error);
+      throw error;
+    }
+  };
+
+  const handleRemoveAdmin = async (userId: string) => {
+    try {
+      await updateUser(userId, { role: 'staff' });
+      toast.success('User removed from college admin');
+      loadUsers();
+    } catch (error: any) {
+      console.error('Failed to remove admin:', error);
+      throw error;
+    }
+  };
+
+  const handleToggleCollegeStatus = async (newStatus: boolean) => {
+    if (!college) return;
+    
+    try {
+      setIsTogglingStatus(true);
+      await updateCollege(collegeId!, { is_active: newStatus });
+      setCollege({ ...college, is_active: newStatus });
+      toast.success(`College ${newStatus ? 'activated' : 'deactivated'} successfully`);
+    } catch (error: any) {
+      console.error('Failed to toggle college status:', error);
+      toast.error(error.response?.data?.detail || 'Failed to toggle college status');
+    } finally {
+      setIsTogglingStatus(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -149,6 +195,28 @@ export const CollegeDetailPage = () => {
       <PageHeader
         title={college.name}
         description={`College Code: ${college.code} | Domain: ${college.domain || 'Not set'}`}
+        actions={
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">Status:</span>
+              <button
+                onClick={() => handleToggleCollegeStatus(!college.is_active)}
+                disabled={isTogglingStatus}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  college.is_active ? 'bg-green-600' : 'bg-gray-200'
+                } ${isTogglingStatus ? 'opacity-50 cursor-not-allowed' : ''}`}
+                title={college.is_active ? 'Click to deactivate' : 'Click to activate'}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    college.is_active ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+              <CollegeStatusBadge isActive={college.is_active} />
+            </div>
+          </div>
+        }
       />
 
       {/* Tabs */}
@@ -297,6 +365,25 @@ export const CollegeDetailPage = () => {
             <CardTitle>College Users</CardTitle>
           </CardHeader>
           <CardContent>
+            {!hasCollegeAdmin && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-yellow-800">
+                      No college admin assigned
+                    </h3>
+                    <div className="mt-2 text-sm text-yellow-700" title="At least one college admin is required for the college to function properly">
+                      <p>This college has no active college admin. Please assign a user as college admin to manage the college.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             {usersLoading ? (
               <div className="flex items-center justify-center h-32">
                 <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -313,6 +400,7 @@ export const CollegeDetailPage = () => {
                       <TableHead>Role</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Joined</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -321,15 +409,44 @@ export const CollegeDetailPage = () => {
                         <TableCell className="font-medium">{user.full_name || '-'}</TableCell>
                         <TableCell>{user.email}</TableCell>
                         <TableCell>
-                          <Badge variant="outline">{user.role}</Badge>
+                          <Badge 
+                            variant={user.role === 'college_admin' ? 'success' : 'outline'}
+                            title={user.role === 'college_admin' ? 'Can manage college settings and users' : 'Regular user role'}
+                          >
+                            {user.role}
+                          </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={user.is_active ? 'success' : 'secondary'}>
+                          <Badge 
+                            variant={user.is_active ? 'success' : 'secondary'}
+                            title={user.is_active ? 'User can log in' : 'User cannot log in'}
+                          >
                             {user.is_active ? 'Active' : 'Inactive'}
                           </Badge>
                         </TableCell>
                         <TableCell>
                           {new Date(user.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          {user.role !== 'college_admin' ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              title="Grant this user college admin privileges"
+                              onClick={() => handleMakeAdmin(user.id)}
+                            >
+                              Make Admin
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              title="Remove this user's college admin privileges"
+                              onClick={() => handleRemoveAdmin(user.id)}
+                            >
+                              Remove Admin
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}

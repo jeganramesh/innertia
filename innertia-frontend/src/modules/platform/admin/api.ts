@@ -82,6 +82,12 @@ export const collegeApi = {
   deleteCollege: async (collegeId: string): Promise<void> => {
     await apiClient.delete(`/platform/admin/colleges/${collegeId}`);
   },
+
+  // Toggle college active status
+  toggleCollegeStatus: async (collegeId: string, isActive: boolean): Promise<College> => {
+    const response = await apiClient.patch<College>(`/platform/admin/colleges/${collegeId}/toggle`, { is_active: isActive });
+    return response.data;
+  },
 };
 
 // College Features API Methods

@@ -9,11 +9,13 @@ import {
   fetchColleges, 
   createCollege, 
   deleteCollege,
+  updateCollege,
+  toggleCollegeStatus,
   College 
 } from '../../modules/admin/api';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Badge } from '../../components/ui/Badge';
+import { Badge, CollegeStatusBadge } from '../../components/ui/Badge';
 import { 
   Table, 
   TableBody, 
@@ -42,6 +44,7 @@ export const CollegesPage = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newCollege, setNewCollege] = useState({ name: '', code: '', domain: '', add_existing_users: false });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadColleges();
@@ -104,13 +107,48 @@ export const CollegesPage = () => {
     }
   };
 
+  const handlePermanentDeleteCollege = async (collegeId: string, collegeName: string) => {
+    if (!confirm(`WARNING: This will PERMANENTLY delete "${collegeName}" and all associated data.\n\nThis action cannot be undone.\n\nAre you absolutely sure?`)) {
+      return;
+    }
+
+    // Double confirmation for destructive action
+    if (!confirm(`Type "DELETE" to confirm permanent deletion of "${collegeName}"`)) {
+      return;
+    }
+
+    try {
+      await deleteCollege(collegeId);
+      toast.success('College deleted successfully');
+      loadColleges();
+    } catch (error: any) {
+      console.error('Failed to delete college:', error);
+      toast.error(error.response?.data?.detail || 'Failed to delete college');
+    }
+  };
+
+  const handleToggleStatus = async (collegeId: string, currentStatus: boolean) => {
+    try {
+      setTogglingId(collegeId);
+      // Use the dedicated toggle endpoint
+      await toggleCollegeStatus(collegeId, !currentStatus);
+      toast.success(`College ${!currentStatus ? 'activated' : 'deactivated'} successfully`);
+      loadColleges();
+    } catch (error: any) {
+      console.error('Failed to toggle college status:', error);
+      toast.error(error.response?.data?.detail || 'Failed to toggle college status');
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
   const totalPages = Math.ceil(total / 20);
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Colleges"
-        description="Manage colleges on the platform"
+        subtitle="Manage colleges on the platform"
         actions={
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
@@ -193,7 +231,7 @@ export const CollegesPage = () => {
                   <TableHead>Code</TableHead>
                   <TableHead>Domain</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Active Features</TableHead>
+                  <TableHead>Toggle</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -212,11 +250,24 @@ export const CollegesPage = () => {
                       <TableCell>{college.code}</TableCell>
                       <TableCell>{college.domain || '-'}</TableCell>
                       <TableCell>
-                        <Badge variant={college.is_active ? 'success' : 'secondary'}>
-                          {college.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
+                        <CollegeStatusBadge isActive={college.is_active} />
                       </TableCell>
-                      <TableCell>{college.active_features_count || 0}</TableCell>
+                      <TableCell>
+                        <button
+                          onClick={() => handleToggleStatus(college.id, college.is_active)}
+                          disabled={togglingId === college.id}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                            college.is_active ? 'bg-green-600' : 'bg-gray-200'
+                          } ${togglingId === college.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          title={college.is_active ? 'Click to deactivate' : 'Click to activate'}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              college.is_active ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </TableCell>
                       <TableCell>
                         {new Date(college.created_at).toLocaleDateString()}
                       </TableCell>
@@ -238,6 +289,15 @@ export const CollegesPage = () => {
                               Deactivate
                             </Button>
                           )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-red-600 border-red-200 hover:bg-red-50"
+                            onClick={() => handlePermanentDeleteCollege(college.id, college.name)}
+                            title="Permanently delete college"
+                          >
+                            Delete
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>

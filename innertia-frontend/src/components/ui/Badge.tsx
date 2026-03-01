@@ -5,6 +5,7 @@ import { twMerge } from 'tailwind-merge';
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   variant?: 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'outline' | 'tinted';
   size?: 'sm' | 'md' | 'lg';
+  title?: string; // Add tooltip support
 }
 
 // Apple-style badge variants with system colors
@@ -25,7 +26,7 @@ const badgeSizes = {
 };
 
 export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
-  ({ className, variant = 'default', size = 'md', children, ...props }, ref) => {
+  ({ className, variant = 'default', size = 'md', children, title, ...props }, ref) => {
     return (
       <span
         ref={ref}
@@ -37,6 +38,7 @@ export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
             className
           )
         )}
+        title={title}
         {...props}
       >
         {children}
@@ -72,6 +74,23 @@ export const StatusBadge = ({ status, ...props }: StatusBadgeProps) => {
   return (
     <Badge variant={statusVariantMap[status]} {...props}>
       {statusLabels[status]}
+    </Badge>
+  );
+};
+
+// College active status badge with tooltips
+export interface CollegeStatusBadgeProps extends Omit<BadgeProps, 'variant' | 'children'> {
+  isActive: boolean;
+}
+
+export const CollegeStatusBadge = ({ isActive, ...props }: CollegeStatusBadgeProps) => {
+  return (
+    <Badge 
+      variant={isActive ? 'success' : 'danger'} 
+      title={isActive ? 'College is active - users can log in' : 'College is inactive - users cannot log in'}
+      {...props}
+    >
+      {isActive ? 'Active' : 'Inactive'}
     </Badge>
   );
 };

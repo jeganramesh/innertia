@@ -5,7 +5,15 @@
 
 import axios, { AxiosInstance } from 'axios';
 import { AdminStats, CollegeManagement, FeatureToggle, RolePermission } from './types';
-import { PaginatedResponse } from '../../shared/types';
+
+// Local type definition for paginated responses
+interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  page?: number;
+  page_size?: number;
+  pages?: number;
+}
 
 // API Configuration
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
@@ -59,7 +67,7 @@ export const createUser = async (userData: any) => {
 };
 
 export const updateUser = async (userId: string, userData: any) => {
-  const response = await adminApi.put(`/admin/users/${userId}`, userData);
+  const response = await adminApi.patch(`/admin/users/${userId}`, userData);
   return response.data;
 };
 
@@ -194,6 +202,15 @@ export const toggleCollegeFeature = async (
   const response = await adminApi.patch<CollegeFeature>(
     `/platform/admin/colleges/${collegeId}/features`,
     { feature_key: featureKey, is_enabled: isEnabled }
+  );
+  return response.data;
+};
+
+// Toggle college status (activate/deactivate)
+export const toggleCollegeStatus = async (collegeId: string, isActive: boolean) => {
+  const response = await adminApi.patch<College>(
+    `/platform/admin/colleges/${collegeId}/toggle`,
+    { is_active: isActive }
   );
   return response.data;
 };

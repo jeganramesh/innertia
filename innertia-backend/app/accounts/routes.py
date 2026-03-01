@@ -9,12 +9,13 @@ from jose import JWTError
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
 
 from app.core.database import get_db
 from app.core.redis import redis_client
 from app.core.config import settings
-from app.models.models import User, RefreshToken
+from app.models.models import User, RefreshToken, College
 from app.accounts.schemas import (
     UserCreate, UserLogin, UserOut, Token,
     TokenRefresh, MessageResponse, ErrorResponse
@@ -134,6 +135,19 @@ async def login(credentials: UserLogin, db: AsyncSession = Depends(get_db)):
             detail="Account is disabled. Please contact administrator."
         )
     
+    # Check if user's college is active (skip for platform admin)
+    if user.role != "admin" and user.college_id:
+        # Query college directly to avoid lazy loading issues
+        result = await db.execute(
+            select(College).where(College.id == user.college_id)
+        )
+        college = result.scalar_one_or_none()
+        if college and not college.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="College is inactive. Contact platform admin."
+            )
+    
     # Create tokens
     access_token = create_access_token(
         data={
@@ -217,7 +231,7 @@ async def refresh_token(token_refresh: TokenRefresh, db: AsyncSession = Depends(
     
     # Get user
     result = await db.execute(
-        select(User).where(User.id == user_id_uuid)
+        select(User).options(selectinload(User.college)).where(User.id == user_id_uuid)
     )
     user = result.scalar_one_or_none()
     
@@ -227,6 +241,14 @@ async def refresh_token(token_refresh: TokenRefresh, db: AsyncSession = Depends(
             detail="User not found or inactive",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    
+    # Check if user's college is active (skip for platform admin)
+    if user.role != "admin" and user.college_id and user.college:
+        if not user.college.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="College is inactive. Contact platform admin."
+            )
     
     # Create new tokens
     access_token = create_access_token(
@@ -297,11 +319,19 @@ async def logout(
     }
 )
 async def get_current_user_info(
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Get current authenticated user's information.
     """
+    # Load college relationship if user has college_id
+    if current_user.college_id:
+        result = await db.execute(
+            select(User).options(selectinload(User.college)).where(User.id == current_user.id)
+        )
+        current_user = result.scalar_one()
+    
     return create_user_response(current_user)
 
 

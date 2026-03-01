@@ -21,6 +21,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { adminApiService, UserOutAdmin, UserCreateAdmin, UserUpdateAdmin } from '../../services/adminApi';
 import { useAuth } from '../../hooks/useAuth';
 import { useColleges } from '../../modules/platform/admin/hooks/useColleges';
+import { toast } from 'react-hot-toast';
 
 // Types
 type UserRole = 'student' | 'faculty' | 'admin' | 'college_admin' | 'staff' | 'trainer';
@@ -59,7 +60,7 @@ export const UsersPage = () => {
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
-  const [collegeFilter, setCollegeFilter] = useState<string | 'all'>('all');
+  const [collegeFilter, setCollegeFilter] = useState<string>('all');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   
   // Modals
@@ -85,13 +86,13 @@ export const UsersPage = () => {
       setLoading(true);
       setError(null);
       
-      const params = {
+      const params: any = {
         page,
         page_size: pageSize,
-        role: roleFilter !== 'all' ? roleFilter : undefined,
-        college_id: collegeFilter !== 'all' ? collegeFilter : undefined,
-        search: debouncedSearch || undefined,
       };
+      if (roleFilter !== 'all') params.role = roleFilter;
+      if (collegeFilter !== 'all') params.college_id = collegeFilter;
+      if (debouncedSearch) params.search = debouncedSearch;
       
       const response = await adminApiService.listUsers(params);
       setUsers(response.items);
@@ -125,8 +126,13 @@ export const UsersPage = () => {
     }
   }, [colleges, currentUser, formData.role]);
   
-  // Calculate pagination
+  // Calculate pagination - backend returns pages count directly
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  
+  // Helper to get user display name
+  const getUserDisplayName = (user: UserOutAdmin) => {
+    return user.full_name || user.name || 'N/A';
+  };
   
   // Handlers
   const handleCreateUser = async () => {
@@ -169,6 +175,7 @@ export const UsersPage = () => {
       };
       
       await adminApiService.createUser(userData);
+      toast.success('User created successfully');
       setShowCreateModal(false);
       setFormData(initialFormData);
       fetchUsers();
@@ -200,6 +207,7 @@ export const UsersPage = () => {
       };
       
       await adminApiService.updateUser(selectedUser.id, userData);
+      toast.success('User updated successfully');
       setShowEditModal(false);
       setSelectedUser(null);
       setFormData(initialFormData);
@@ -214,16 +222,17 @@ export const UsersPage = () => {
   const handleToggleUser = async (user: UserOutAdmin) => {
     try {
       await adminApiService.toggleUser(user.id);
+      toast.success(`User ${user.is_active ? 'deactivated' : 'activated'} successfully`);
       fetchUsers();
     } catch (err: any) {
       const errorDetail = err.response?.data?.detail || 'Failed to toggle user status';
       // Show more specific error messages
       if (errorDetail.includes('Cannot disable your own account')) {
-        alert('You cannot disable your own account.');
+        toast.error('You cannot disable your own account.');
       } else if (errorDetail.includes('Cannot disable the last admin')) {
-        alert('Cannot disable the last admin account.');
+        toast.error('Cannot disable the last admin account.');
       } else {
-        alert(errorDetail);
+        toast.error(errorDetail);
       }
     }
   };
@@ -234,6 +243,7 @@ export const UsersPage = () => {
     try {
       setFormLoading(true);
       await adminApiService.deleteUser(selectedUser.id);
+      toast.success('User deactivated successfully');
       setShowDeleteModal(false);
       setSelectedUser(null);
       fetchUsers();
@@ -248,7 +258,7 @@ export const UsersPage = () => {
     setSelectedUser(user);
     setFormData({
       email: user.email,
-      name: user.name || '',
+      name: user.full_name || user.name || '',
       role: (user.role as UserRole) || 'student',
       is_active: user.is_active
     });
@@ -276,6 +286,12 @@ export const UsersPage = () => {
         {role.charAt(0).toUpperCase() + role.slice(1).replace('_', ' ')}
       </span>
     );
+  };
+
+  const isCollegeInactive = (user: UserOutAdmin) => {
+    if (!user.college_id) return false;
+    const college = colleges.find(c => c.id === user.college_id);
+    return college ? !college.is_active : false;
   };
   
   const canModifyUser = (user: UserOutAdmin) => {
@@ -410,23 +426,28 @@ export const UsersPage = () => {
               ) : (
                 users.map((user) => (
                   <tr key={user.id} className="hover:bg-[#f5f5f7]/50 transition-colors">
-                    <td className="px-6 py-4">
+                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-[#f5f5f7] flex items-center justify-center">
                           <UserCog className="w-5 h-5 text-[#86868b]" />
                         </div>
                         <div>
-                          <p className="font-medium text-[#1d1d1f]">{user.name || 'N/A'}</p>
+                          <p className="font-medium text-[#1d1d1f]">{getUserDisplayName(user)}</p>
                           <p className="text-sm text-[#86868b]">{user.email}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <Building2 className="w-4 h-4 text-[#86868b]" />
-                        <span className="text-sm text-[#1d1d1f]">
-                          {user.college_name || (user.college_id ? `College #${user.college_id}` : '—')}
+                        <Building2 className={`w-4 h-4 ${isCollegeInactive(user) ? 'text-red-400' : 'text-[#86868b]'}`} />
+                        <span className={`text-sm ${isCollegeInactive(user) ? 'text-red-600 line-through' : 'text-[#1d1d1f]'}`}>
+                          {user.college_id ?
+                            (colleges.find(c => c.id === user.college_id)?.name || `College #${user.college_id}`)
+                            : '—'}
                         </span>
+                        {isCollegeInactive(user) && (
+                          <span className="text-xs text-red-500 font-medium">(Inactive)</span>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -434,15 +455,15 @@ export const UsersPage = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        {user.is_active ? (
+                        {!user.is_active || isCollegeInactive(user) ? (
+                          <span className="inline-flex items-center gap-1 text-gray-400">
+                            <ToggleLeft className="w-4 h-4" />
+                            {isCollegeInactive(user) ? 'Inactive (College)' : 'Inactive'}
+                          </span>
+                        ) : (
                           <span className="inline-flex items-center gap-1 text-green-600">
                             <ToggleRight className="w-4 h-4" />
                             Active
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-gray-400">
-                            <ToggleLeft className="w-4 h-4" />
-                            Inactive
                           </span>
                         )}
                       </div>
@@ -735,7 +756,7 @@ export const UsersPage = () => {
             )}
             {selectedUser && (
               <div className="bg-gray-50 rounded-lg p-4">
-                <p className="font-medium">{selectedUser.name || 'N/A'}</p>
+                <p className="font-medium">{getUserDisplayName(selectedUser)}</p>
                 <p className="text-sm text-gray-500">{selectedUser.email}</p>
                 <p className="text-xs text-gray-400 mt-1">Role: {selectedUser.role}</p>
               </div>

@@ -118,3 +118,40 @@ export const useDeleteCollege = () => {
     },
   });
 };
+
+// Hook to toggle college status
+export const useToggleCollegeStatus = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ collegeId, isActive }: { collegeId: string; isActive: boolean }) =>
+      collegeApi.toggleCollegeStatus(collegeId, isActive),
+    onMutate: async ({ collegeId, isActive }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: collegeKeys.detail(collegeId) });
+
+      // Snapshot previous value
+      const previousCollege = queryClient.getQueryData(collegeKeys.detail(collegeId));
+
+      // Optimistically update
+      queryClient.setQueryData(collegeKeys.detail(collegeId), (old: any) => ({
+        ...old,
+        is_active: isActive,
+      }));
+
+      return { previousCollege };
+    },
+    onError: (err, { collegeId }, context) => {
+      // Rollback on error
+      if (context?.previousCollege) {
+        queryClient.setQueryData(collegeKeys.detail(collegeId), context.previousCollege);
+      }
+      toast.error('Failed to toggle college status');
+    },
+    onSettled: (_, __, { collegeId }) => {
+      // Refetch after mutation
+      queryClient.invalidateQueries({ queryKey: collegeKeys.detail(collegeId) });
+      queryClient.invalidateQueries({ queryKey: collegeKeys.lists() });
+    },
+  });
+};

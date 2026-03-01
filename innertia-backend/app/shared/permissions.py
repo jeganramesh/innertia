@@ -148,14 +148,17 @@ def has_permission(role: str, resource: str, action: str) -> bool:
     Returns:
         True if permission is granted, False otherwise
     """
-    role_perms = PERMISSION_MATRIX.get(role, {})
+    # Normalize role to lowercase for case-insensitive comparison
+    normalized_role = (role or '').lower()
+    role_perms = PERMISSION_MATRIX.get(normalized_role, {})
     resource_perms = role_perms.get(resource, [])
     return action in resource_perms
 
 
 def get_role_permissions(role: str) -> dict[str, list[str]]:
     """Get all permissions for a role."""
-    return PERMISSION_MATRIX.get(role, {})
+    normalized_role = (role or '').lower()
+    return PERMISSION_MATRIX.get(normalized_role, {})
 
 
 # =============================================================================
@@ -189,10 +192,11 @@ def require_roles(*allowed_roles: str):
         HTTPException 403: If user's role is not in allowed_roles
     """
     async def role_checker(current_user: User = Depends(get_current_user)):
-        # For backward compatibility, treat "admin" role as is
-        user_role = current_user.role
+        # Normalize role to lowercase for case-insensitive comparison
+        user_role = (current_user.role or '').lower()
+        normalized_allowed = [r.lower() for r in allowed_roles]
         
-        if user_role not in allowed_roles:
+        if user_role not in normalized_allowed:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Access denied. Required roles: {', '.join(allowed_roles)}"
@@ -227,6 +231,8 @@ def require_permission(resource: str, action: str):
                 detail=f"Permission denied. {action} on {resource} not allowed for role {current_user.role}"
             )
         return current_user
+    
+    return permission_checker
     
     return permission_checker
 

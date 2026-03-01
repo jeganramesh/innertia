@@ -29,11 +29,12 @@ export interface UserOutAdmin {
   id: string;
   email: string;
   name?: string;
+  full_name?: string;
   role: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;
-  college_id?: number;
+  college_id?: string | number;
   college_name?: string;
 }
 
@@ -197,11 +198,22 @@ const createAdminApiClient = (): AxiosInstance => {
 const adminApi = createAdminApiClient();
 
 // Admin API Service - Platform Admin endpoints
+// Maps to backend /api/v1/admin/* and /api/v1/platform/admin/* routes
 export const adminApiService = {
   // ============ User Management ============
 
   async createUser(data: UserCreateAdmin): Promise<UserOutAdmin> {
-    const response = await adminApi.post<UserOutAdmin>('/platform-admin/users', data);
+    // Backend expects form-style data for create user
+    const formData = new URLSearchParams();
+    formData.append('email', data.email);
+    formData.append('password', data.password);
+    if (data.name) formData.append('full_name', data.name);
+    formData.append('role', data.role);
+    if (data.college_id) formData.append('college_id', data.college_id);
+    
+    const response = await adminApi.post<UserOutAdmin>('/admin/users', formData.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
     return response.data;
   },
 
@@ -211,40 +223,68 @@ export const adminApiService = {
     role?: string;
     college_id?: string;
     is_active?: boolean;
+    search?: string;
   }): Promise<UserListResponse> {
-    const response = await adminApi.get<UserListResponse>('/platform-admin/users', { params });
+    // Convert page to skip/limit for backend
+    const backendParams: any = {
+      skip: ((params?.page || 1) - 1) * (params?.page_size || 10),
+      limit: params?.page_size || 10,
+    };
+    if (params?.role) backendParams.role = params.role;
+    if (params?.college_id) backendParams.college_id = params.college_id;
+    if (params?.is_active !== undefined) backendParams.is_active = params.is_active;
+    if (params?.search) backendParams.search = params.search;
+    
+    const response = await adminApi.get<UserListResponse>('/admin/users', { params: backendParams });
     return response.data;
   },
 
   async getUser(userId: string): Promise<UserOutAdmin> {
-    const response = await adminApi.get<UserOutAdmin>(`/platform-admin/users/${userId}`);
-    return response.data;
+    // Get all users and find the one we need (backend doesn't have single user endpoint)
+    const response = await adminApi.get<UserListResponse>('/admin/users', { 
+      params: { skip: 0, limit: 1000 } 
+    });
+    const user = response.data.items.find(u => u.id === userId);
+    if (!user) throw new Error('User not found');
+    return user;
   },
 
   async updateUser(userId: string, data: UserUpdateAdmin): Promise<UserOutAdmin> {
-    const response = await adminApi.patch<UserOutAdmin>(`/platform-admin/users/${userId}`, data);
+    // Backend uses form-style data for update
+    const formData = new URLSearchParams();
+    if (data.name !== undefined) formData.append('full_name', data.name);
+    if (data.role !== undefined) formData.append('role', data.role);
+    if (data.is_active !== undefined) formData.append('is_active', data.is_active.toString());
+    
+    const response = await adminApi.patch<UserOutAdmin>(`/admin/users/${userId}`, formData.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
     return response.data;
   },
 
+  async toggleUser(userId: string): Promise<UserOutAdmin> {
+    // Get current user state first
+    const user = await this.getUser(userId);
+    // Toggle the is_active status
+    return this.updateUser(userId, { is_active: !user.is_active });
+  },
+
   async deleteUser(userId: string): Promise<void> {
-    await adminApi.delete(`/platform-admin/users/${userId}`);
+    await adminApi.delete(`/admin/users/${userId}`);
   },
 
   // ============ Bulk Upload ============
 
   async bulkUploadUsers(file: File): Promise<BulkUploadResponse> {
-    const formData = new FormData();
-    formData.append('file', file);
-    const response = await adminApi.post<BulkUploadResponse>('/platform-admin/users/bulk-upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    return response.data;
+    // Not implemented in backend yet
+    throw new Error('Bulk upload not implemented');
   },
 
   // ============ Class Management ============
+  // Note: These endpoints may not exist in backend yet
 
   async createClass(data: ClassCreate): Promise<ClassOut> {
-    const response = await adminApi.post<ClassOut>('/platform-admin/classes', data);
+    const response = await adminApi.post<ClassOut>('/admin/classes', data);
     return response.data;
   },
 
@@ -253,28 +293,28 @@ export const adminApiService = {
     page_size?: number;
     faculty_id?: string;
   }): Promise<{ items: ClassOut[]; total: number }> {
-    const response = await adminApi.get<{ items: ClassOut[]; total: number }>('/platform-admin/classes', { params });
+    const response = await adminApi.get<{ items: ClassOut[]; total: number }>('/admin/classes', { params });
     return response.data;
   },
 
   async getClass(classId: string): Promise<ClassOut> {
-    const response = await adminApi.get<ClassOut>(`/platform-admin/classes/${classId}`);
+    const response = await adminApi.get<ClassOut>(`/admin/classes/${classId}`);
     return response.data;
   },
 
   async updateClass(classId: string, data: ClassUpdate): Promise<ClassOut> {
-    const response = await adminApi.patch<ClassOut>(`/platform-admin/classes/${classId}`, data);
+    const response = await adminApi.patch<ClassOut>(`/admin/classes/${classId}`, data);
     return response.data;
   },
 
   async deleteClass(classId: string): Promise<void> {
-    await adminApi.delete(`/platform-admin/classes/${classId}`);
+    await adminApi.delete(`/admin/classes/${classId}`);
   },
 
   // ============ Dashboard ============
 
   async getDashboardStats(): Promise<DashboardStats> {
-    const response = await adminApi.get<DashboardStats>('/platform-admin/analytics');
+    const response = await adminApi.get<DashboardStats>('/admin/dashboard');
     return response.data;
   },
 
@@ -285,20 +325,19 @@ export const adminApiService = {
     page_size?: number;
     is_active?: boolean;
   }): Promise<SessionListResponse> {
-    const response = await adminApi.get<SessionListResponse>('/platform-admin/sessions', { params });
+    const response = await adminApi.get<SessionListResponse>('/admin/sessions', { params });
     return response.data;
   },
 
   // ============ Settings ============
+  // Note: Settings endpoints may not exist in backend yet
 
   async getSettings(): Promise<SystemSettings> {
-    const response = await adminApi.get<SystemSettings>('/platform-admin/settings');
-    return response.data;
+    throw new Error('Settings not implemented');
   },
 
   async updateSettings(data: Partial<SystemSettings>): Promise<SystemSettings> {
-    const response = await adminApi.patch<SystemSettings>('/platform-admin/settings', data);
-    return response.data;
+    throw new Error('Settings not implemented');
   },
 
   // ============ Audit Logs ============
@@ -312,7 +351,15 @@ export const adminApiService = {
     end_date?: string;
     user_id?: string;
   }): Promise<AuditLogListResponse> {
-    const response = await adminApi.get<AuditLogListResponse>('/platform-admin/audit-logs', { params });
+    const backendParams: any = {
+      skip: ((params?.page || 1) - 1) * (params?.page_size || 10),
+      limit: params?.page_size || 10,
+    };
+    if (params?.action) backendParams.action = params.action;
+    if (params?.entity_type) backendParams.target_type = params.entity_type;
+    if (params?.user_id) backendParams.performed_by = params.user_id;
+    
+    const response = await adminApi.get<AuditLogListResponse>('/admin/audit-logs', { params: backendParams });
     return response.data;
   }
 };

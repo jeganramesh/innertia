@@ -10,12 +10,14 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
 from sqlalchemy.exc import IntegrityError
 
 from app.core.database import get_db
 from app.models.models import User, College, Class, Session as SessionModel, Enrollment, AuditLog
-from app.shared.permissions import require_roles
+from app.accounts.dependencies import require_roles
+from app.shared.audit_helpers import create_audit_log
+from app.shared.college_helpers import has_college_admins
 from app.accounts.dependencies import get_current_user
 from app.modules.platform.admin.service import AnalyticsService
 from app.modules.platform.admin.schemas import (
@@ -286,6 +288,122 @@ async def update_college(
         )
 
 
+@router.patch("/colleges/{college_id}/toggle", response_model=CollegeResponse)
+async def toggle_college_status(
+    college_id: UUID,
+    toggle_data: dict,
+    current_user: User = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Toggle college active status (admin only).
+    
+    Accepts: { "is_active": boolean }
+    """
+    logger.info(f"Toggling college status: {college_id}")
+    
+    # Get is_active from request body
+    is_active = toggle_data.get("is_active")
+    if is_active is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="is_active field is required"
+        )
+    
+    result = await db.execute(
+        select(College).where(College.id == college_id)
+    )
+    college = result.scalar_one_or_none()
+    
+    if not college:
+        logger.warning(f"College not found: {college_id}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="College not found"
+        )
+    
+    # Check if trying to deactivate a college with users but no college admin
+    if is_active is False and college.is_active == True:
+        # Check if college has any users
+        users_result = await db.execute(
+            select(func.count(User.id)).where(
+                User.college_id == college_id,
+                User.deleted_at.is_(None)
+            )
+        )
+        user_count = users_result.scalar() or 0
+        
+        if user_count > 0:
+            # Check if college has at least one college admin
+            has_admin = await has_college_admins(db, college_id)
+            if not has_admin:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cannot deactivate college with users but no college admin. Please assign a college admin first."
+                )
+    
+    try:
+        # Store old value for audit
+        old_is_active = college.is_active
+        college.is_active = is_active
+        
+        # If deactivating college, also deactivate all associated users
+        deactivated_user_count = 0
+        if not is_active and old_is_active:
+            result = await db.execute(
+                update(User)
+                .where(
+                    User.college_id == college_id,
+                    User.is_active == True,
+                    User.deleted_at.is_(None)
+                )
+                .values(is_active=False)
+            )
+            deactivated_user_count = result.rowcount
+            logger.info(f"Deactivated {deactivated_user_count} users for college: {college_id}")
+        
+        await db.commit()
+        await db.refresh(college)
+        
+        # Create audit log entry
+        await create_audit_log(
+            db=db,
+            action="COLLEGE_STATUS_TOGGLE",
+            performed_by=current_user.id,
+            target_type="College",
+            target_id=str(college.id),
+            college_id=college.id,
+            metadata={
+                "college_name": college.name,
+                "old_is_active": old_is_active,
+                "new_is_active": is_active,
+                "deactivated_user_count": deactivated_user_count if not is_active and old_is_active else 0
+            }
+        )
+        await db.commit()
+        
+        status_word = "activated" if is_active else "deactivated"
+        logger.info(f"College {status_word} successfully: {college_id}")
+        
+        return CollegeResponse(
+            id=str(college.id),
+            name=college.name,
+            code=college.code,
+            domain=college.domain,
+            is_active=college.is_active,
+            created_at=college.created_at.isoformat() if college.created_at else None,
+            updated_at=college.updated_at.isoformat() if college.updated_at else None
+        )
+        
+    except Exception as e:
+        logger.error(f"Error toggling college status: {e}")
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to toggle college status"
+        )
+
+
 @router.delete("/colleges/{college_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_college(
     college_id: UUID,
@@ -311,12 +429,43 @@ async def delete_college(
             detail="College not found"
         )
     
+    # Check if college has users but no college admin
+    users_result = await db.execute(
+        select(func.count(User.id)).where(
+            User.college_id == college_id,
+            User.deleted_at.is_(None)
+        )
+    )
+    user_count = users_result.scalar() or 0
+    
+    if user_count > 0:
+        # Check if college has at least one college admin
+        has_admin = await has_college_admins(db, college_id)
+        if not has_admin:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot deactivate college with users but no college admin. Please assign a college admin first."
+            )
+    
     try:
         # Soft delete - just set is_active to False
         college.is_active = False
+        
+        # Also deactivate all associated users
+        result = await db.execute(
+            update(User)
+            .where(
+                User.college_id == college_id,
+                User.is_active == True,
+                User.deleted_at.is_(None)
+            )
+            .values(is_active=False)
+        )
+        deactivated_user_count = result.rowcount
+        
         await db.commit()
         
-        logger.info(f"College deactivated successfully: {college_id}")
+        logger.info(f"College deactivated successfully: {college_id}, deactivated {deactivated_user_count} users")
         return None
         
     except Exception as e:

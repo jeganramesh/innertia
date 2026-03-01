@@ -14,6 +14,7 @@ from sqlalchemy import select, func, and_, or_
 from app.core.database import get_db
 from app.models.models import User, College, Class, Session as SessionModel, Enrollment, AuditLog
 from app.shared.permissions import require_roles
+from app.shared.audit_helpers import create_audit_log
 from app.accounts.dependencies import get_current_user
 from app.accounts.utils import hash_password
 from app.modules.platform.admin.service import AnalyticsService
@@ -37,11 +38,13 @@ async def admin_dashboard(
 ):
     """Get admin dashboard data."""
     
+    from datetime import datetime, timedelta
+    
     # Get total colleges
     college_count_result = await db.execute(
         select(func.count(College.id)).where(College.is_active == True)
     )
-    college_count = college_count_result.scalar()
+    college_count = college_count_result.scalar() or 0
     
     # Get total users by role
     user_counts = {}
@@ -54,7 +57,7 @@ async def admin_dashboard(
                 User.deleted_at.is_(None)
             )
         )
-        user_counts[role] = result.scalar()
+        user_counts[role] = result.scalar() or 0
     
     # Admin count
     admin_result = await db.execute(
@@ -63,31 +66,65 @@ async def admin_dashboard(
             User.is_active == True
         )
     )
-    user_counts["admin"] = admin_result.scalar()
+    user_counts["admin"] = admin_result.scalar() or 0
     
     # Get total classes
     class_count_result = await db.execute(select(func.count(Class.id)))
-    class_count = class_count_result.scalar()
+    class_count = class_count_result.scalar() or 0
     
     # Get active sessions
-    session_count_result = await db.execute(
+    active_session_result = await db.execute(
         select(func.count(SessionModel.id)).where(SessionModel.is_active == True)
     )
-    session_count = session_count_result.scalar()
+    active_sessions = active_session_result.scalar() or 0
     
+    # Get total sessions (all time)
+    total_session_result = await db.execute(select(func.count(SessionModel.id)))
+    total_sessions = total_session_result.scalar() or 0
+    
+    # Get sessions in the last 30 days
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    last_30_day_result = await db.execute(
+        select(func.count(SessionModel.id)).where(
+            SessionModel.started_at >= thirty_days_ago
+        )
+    )
+    last_30_day_sessions = last_30_day_result.scalar() or 0
+    
+    # Calculate average attendance rate (simplified - based on enrollments)
+    enrollment_count_result = await db.execute(
+        select(func.count(Enrollment.id))
+    )
+    total_enrollments = enrollment_count_result.scalar() or 0
+    
+    # For average attendance, we'll calculate from present marks if available
+    # For now, let's return a placeholder since we don't have attendance records
+    average_attendance_rate = 0.0
+    
+    # Get violations in last 7 days (simplified - return 0 for now)
+    total_violations_7_days = 0
+    
+    # Return data in format expected by frontend
     return {
-        "stats": {
-            "colleges": college_count,
-            "admins": user_counts.get("admin", 0),
-            "college_admins": user_counts.get("college_admin", 0),
-            "staff": user_counts.get("staff", 0),
+        "total_users": sum(user_counts.values()),
+        "total_students": user_counts.get("student", 0),
+        "total_faculty": user_counts.get("faculty", 0),
+        "total_admins": user_counts.get("admin", 0),
+        "total_classes": class_count,
+        "total_sessions": total_sessions,
+        "active_sessions": active_sessions,
+        "last_30_day_sessions": last_30_day_sessions,
+        "users_by_role": {
+            "admin": user_counts.get("admin", 0),
             "faculty": user_counts.get("faculty", 0),
-            "trainers": user_counts.get("trainer", 0),
-            "students": user_counts.get("student", 0),
-            "total_users": sum(user_counts.values()),
-            "classes": class_count,
-            "active_sessions": session_count
-        }
+            "student": user_counts.get("student", 0)
+        },
+        "average_attendance_rate": average_attendance_rate,
+        "total_violations_7_days": total_violations_7_days,
+        "total_colleges": college_count,
+        "total_staff": user_counts.get("staff", 0),
+        "total_trainers": user_counts.get("trainer", 0),
+        "total_college_admins": user_counts.get("college_admin", 0)
     }
 
 
@@ -392,6 +429,11 @@ async def update_admin_user(
             detail="Cannot change your own role"
         )
     
+    # Store old values for audit logging
+    old_role = user.role
+    old_is_active = user.is_active
+    old_college_id = user.college_id
+    
     if full_name is not None:
         user.full_name = full_name
     if role is not None:
@@ -411,6 +453,72 @@ async def update_admin_user(
     await db.commit()
     await db.refresh(user)
     
+    # Create audit log entries for role changes
+    if role is not None and role != old_role:
+        await create_audit_log(
+            db=db,
+            action="USER_ROLE_CHANGE",
+            performed_by=current_user.id,
+            target_type="User",
+            target_id=str(user.id),
+            college_id=user.college_id,
+            metadata={
+                "user_email": user.email,
+                "old_role": old_role,
+                "new_role": role
+            }
+        )
+        await db.commit()
+    
+    # Create audit log entries for is_active changes
+    if is_active is not None and is_active != old_is_active:
+        await create_audit_log(
+            db=db,
+            action="USER_ACTIVE_TOGGLE",
+            performed_by=current_user.id,
+            target_type="User",
+            target_id=str(user.id),
+            college_id=user.college_id,
+            metadata={
+                "user_email": user.email,
+                "old_is_active": old_is_active,
+                "new_is_active": is_active
+            }
+        )
+        await db.commit()
+    
+    # Create audit log entries for college assignment changes
+    if college_id is not None and college_id != old_college_id:
+        old_college_name = None
+        new_college_name = None
+        if old_college_id:
+            result = await db.execute(select(College).where(College.id == old_college_id))
+            old_college = result.scalar_one_or_none()
+            if old_college:
+                old_college_name = old_college.name
+        if college_id:
+            result = await db.execute(select(College).where(College.id == college_id))
+            new_college = result.scalar_one_or_none()
+            if new_college:
+                new_college_name = new_college.name
+        
+        await create_audit_log(
+            db=db,
+            action="USER_COLLEGE_ASSIGN",
+            performed_by=current_user.id,
+            target_type="User",
+            target_id=str(user.id),
+            college_id=college_id,
+            metadata={
+                "user_email": user.email,
+                "old_college_id": str(old_college_id) if old_college_id else None,
+                "old_college_name": old_college_name,
+                "new_college_id": str(college_id) if college_id else None,
+                "new_college_name": new_college_name
+            }
+        )
+        await db.commit()
+    
     return {
         "id": str(user.id),
         "email": user.email,
@@ -419,6 +527,60 @@ async def update_admin_user(
         "college_id": str(user.college_id) if user.college_id else None,
         "is_active": user.is_active
     }
+
+
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(
+    user_id: UUID,
+    current_user: User = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Soft delete a user (admin only).
+    
+    Sets the user's deleted_at timestamp and is_active to False.
+    """
+    from datetime import datetime
+    
+    result = await db.execute(
+        select(User).where(User.id == user_id)
+    )
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Prevent deleting own account
+    if user.id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete your own account"
+        )
+    
+    # Soft delete - set deleted_at and is_active
+    user.deleted_at = datetime.utcnow()
+    user.is_active = False
+    await db.commit()
+    
+    # Create audit log
+    await create_audit_log(
+        db=db,
+        action="USER_DELETE",
+        performed_by=current_user.id,
+        target_type="User",
+        target_id=str(user.id),
+        college_id=user.college_id,
+        metadata={
+            "user_email": user.email,
+            "user_role": user.role
+        }
+    )
+    await db.commit()
+    
+    return None
 
 
 # =============================================================================
