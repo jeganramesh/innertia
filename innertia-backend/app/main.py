@@ -119,6 +119,13 @@ app.include_router(legacy_student_router, prefix=settings.API_V1_PREFIX)
 # Legacy AI notes router
 app.include_router(ai_notes_router, prefix=settings.API_V1_PREFIX)
 
+# Examination routers (already have /api/v1 prefix defined in router)
+from app.examination import examination_router, examination_enhanced_router
+from app.examination.router_simplified import router as examination_simplified_router
+app.include_router(examination_router)  # Router already has /api/v1/examination prefix
+app.include_router(examination_enhanced_router)  # Router already has prefix
+app.include_router(examination_simplified_router)  # Router already has prefix
+
 
 # Health check endpoint
 @app.get("/health", tags=["Health"])

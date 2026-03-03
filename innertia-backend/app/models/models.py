@@ -16,7 +16,7 @@ from datetime import datetime
 from typing import Optional, List
 from sqlalchemy import (
     Column, String, Boolean, DateTime, Text, ForeignKey, 
-    Integer, Enum as SQLEnum, UniqueConstraint, Index, JSON
+    Integer, Float, Enum as SQLEnum, UniqueConstraint, Index, JSON
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship, declarative_base
@@ -126,6 +126,20 @@ class College(Base):
         lazy="dynamic"
     )
     
+    # Departments in this college
+    departments: List["Department"] = relationship(
+        "Department",
+        back_populates="college",
+        foreign_keys="Department.college_id"
+    )
+    
+    # Custom field definitions in this college
+    custom_field_definitions: List["CustomFieldDefinition"] = relationship(
+        "CustomFieldDefinition",
+        back_populates="college",
+        foreign_keys="CustomFieldDefinition.college_id"
+    )
+    
     def __repr__(self) -> str:
         return f"<College(id={self.id}, name={self.name}, code={self.code})>"
 
@@ -170,6 +184,14 @@ class User(Base):
     # Soft delete
     deleted_at = Column(DateTime, nullable=True)
     
+    # Student management fields
+    department_id = Column(UUID(as_uuid=True), ForeignKey("departments.id"), nullable=True)
+    current_year = Column(Integer, nullable=True)  # 1,2,3,4 (or 0 if not applicable)
+    section = Column(String(10), nullable=True)  # e.g., "A", "B"
+    register_number = Column(String(50), nullable=True)  # Unique within college
+    batch_id = Column(UUID(as_uuid=True), ForeignKey("batches.id"), nullable=True, index=True)
+    custom_fields = Column(JSONB, nullable=True)  # Stores key-value pairs for custom fields
+    
     # =========================================================================
     # RELATIONSHIPS
     # =========================================================================
@@ -180,6 +202,16 @@ class User(Base):
         back_populates="users",
         foreign_keys=[college_id]
     )
+    
+    # Department relationship
+    department: "Department" = relationship(
+        "Department",
+        back_populates="students",
+        foreign_keys=[department_id]
+    )
+    
+    # Batch relationship
+    batch: "Batch" = relationship("Batch", back_populates=None)
     
     # Classes taught by faculty
     taught_classes: List["Class"] = relationship(
@@ -923,6 +955,897 @@ class RoleFeaturePermission(Base):
 # DATABASE INDEXES (Additional performance indexes)
 # =============================================================================
 
+# =============================================================================
+# EXAMINATION & ASSESSMENT MODELS
+# =============================================================================
+
+class ExamTypeEnum(str, enum.Enum):
+    """Exam type enumeration."""
+    MCQ = "mcq"
+    CODING = "coding"
+    # Legacy values for backward compatibility
+    QUIZ = "quiz"
+    MIDTERM = "midterm"
+    FINAL = "final"
+    PRACTICAL = "practical"
+
+
+class ExamStatusEnum(str, enum.Enum):
+    """Exam status enumeration."""
+    DRAFT = "draft"
+    SCHEDULED = "scheduled"
+    ONGOING = "ongoing"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
+
+class AssessmentTypeEnum(str, enum.Enum):
+    """Assessment type enumeration."""
+    QUIZ = "quiz"
+    ASSIGNMENT = "assignment"
+    LAB = "lab"
+
+
+class AssessmentStatusEnum(str, enum.Enum):
+    """Assessment status enumeration."""
+    DRAFT = "draft"
+    PUBLISHED = "published"
+    CLOSED = "closed"
+
+
+class QuestionTypeEnum(str, enum.Enum):
+    """Question type enumeration."""
+    MCQ = "mcq"
+    TRUE_FALSE = "true_false"
+    SHORT_ANSWER = "short_answer"
+    ESSAY = "essay"
+
+
+class SubmissionStatusEnum(str, enum.Enum):
+    """Submission status enumeration."""
+    IN_PROGRESS = "in_progress"
+    SUBMITTED = "submitted"
+    GRADED = "graded"
+
+
+class ViolationTypeEnum(str, enum.Enum):
+    """Violation type enumeration for proctoring."""
+    TAB_SWITCH = "tab_switch"
+    FULLSCREEN_EXIT = "fullscreen_exit"
+    MULTIPLE_FACES = "multiple_faces"
+    FACE_NOT_VISIBLE = "face_not_visible"
+    PHONE_DETECTED = "phone_detected"
+    SCREENSHOT = "screenshot"
+    COPY_PASTE = "copy_paste"
+    IDLE_TIMEOUT = "idle_timeout"
+
+
+class ViolationSeverityEnum(str, enum.Enum):
+    """Violation severity enumeration."""
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class MonitoringEventTypeEnum(str, enum.Enum):
+    """Monitoring event type enumeration."""
+    VIOLATION = "violation"
+    START = "start"
+    SUBMIT = "submit"
+    PAUSE = "pause"
+    RESUME = "resume"
+    AUTO_SUBMIT = "auto_submit"
+    TERMINATE = "terminate"
+
+
+class ExamAttemptStatusEnum(str, enum.Enum):
+    """Exam attempt status enumeration."""
+    IN_PROGRESS = "in_progress"
+    SUBMITTED = "submitted"
+    AUTO_SUBMITTED = "auto_submitted"
+    GRADED = "graded"
+    TERMINATED = "terminated"
+
+
+class Exam(Base):
+    """
+    Exams table - Stores exam information for colleges.
+    
+    Fields:
+    - id: Primary key (UUID)
+    - college_id: Foreign key to colleges
+    - title: Exam title
+    - description: Exam description
+    - exam_type: Type of exam (quiz, midterm, final, practical)
+    - status: Exam status (draft, scheduled, ongoing, completed, cancelled)
+    - scheduled_at: Scheduled start date/time
+    - duration_minutes: Exam duration
+    - total_marks: Total marks
+    - passing_marks: Passing marks
+    - instructions: Exam instructions
+    - course_id: Optional link to a class/course
+    - exam_template_id: Optional reference to exam template
+    - is_immediate: If true, starts on student click
+    - max_attempts: Maximum number of attempts allowed
+    - proctoring_config: JSON config for proctoring settings
+    - created_by: User who created the exam
+    - created_at: Creation timestamp
+    - updated_at: Last update timestamp
+    - deleted_at: Soft delete timestamp
+    """
+    
+    __tablename__ = "exams"
+    __allow_unmapped__ = True
+    
+    # Primary key
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # Foreign keys
+    college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.id"), nullable=False, index=True)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    course_id = Column(UUID(as_uuid=True), ForeignKey("classes.id"), nullable=True, index=True)
+    exam_template_id = Column(UUID(as_uuid=True), ForeignKey("exam_templates.id"), nullable=True, index=True)
+    
+    # Core fields
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    exam_type = Column(SQLEnum(ExamTypeEnum, values_callable=lambda x: [e.value for e in x]), nullable=False, default=ExamTypeEnum.MCQ)
+    status = Column(SQLEnum(ExamStatusEnum, values_callable=lambda x: [e.value for e in x]), nullable=False, default=ExamStatusEnum.DRAFT, index=True)
+    scheduled_at = Column(DateTime, nullable=True, index=True)
+    duration_minutes = Column(Integer, nullable=True)
+    total_marks = Column(Integer, nullable=True)
+    passing_marks = Column(Integer, nullable=True)
+    instructions = Column(Text, nullable=True)
+    is_immediate = Column(Boolean, default=False, nullable=False)
+    max_attempts = Column(Integer, default=1, nullable=True)
+    proctoring_config = Column(JSONB, nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    deleted_at = Column(DateTime, nullable=True, index=True)
+    
+    # =========================================================================
+    # CONSTRAINTS
+    # =========================================================================
+    
+    __table_args__ = (
+        Index('ix_exam_college_status_scheduled', 'college_id', 'status', 'scheduled_at'),
+    )
+    
+    # =========================================================================
+    # RELATIONSHIPS
+    # =========================================================================
+    
+    college: "College" = relationship("College", back_populates=None)
+    creator: "User" = relationship("User", back_populates=None)
+    questions = relationship("ExamQuestion", back_populates="exam", cascade="all, delete-orphan")
+    submissions = relationship("ExamSubmission", back_populates="exam", cascade="all, delete-orphan")
+    
+    def __repr__(self) -> str:
+        return f"<Exam(id={self.id}, title={self.title}, status={self.status})>"
+
+
+class ExamQuestion(Base):
+    """
+    Exam questions table - Stores questions for exams.
+    
+    Fields:
+    - id: Primary key (UUID)
+    - exam_id: Foreign key to exams
+    - question_text: Question content
+    - question_type: Type (mcq, true_false, short_answer, essay)
+    - options: JSON array for MCQ options
+    - correct_answer: Correct answer
+    - marks: Points for this question
+    - negative_marks: Negative marks for wrong answer
+    - section: Optional section name for section-wise timing
+    - order_index: Question order
+    - created_at: Creation timestamp
+    - updated_at: Last update timestamp
+    - deleted_at: Soft delete timestamp
+    """
+    
+    __tablename__ = "exam_questions"
+    __allow_unmapped__ = True
+    
+    # Primary key
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # Foreign keys
+    exam_id = Column(UUID(as_uuid=True), ForeignKey("exams.id"), nullable=False, index=True)
+    
+    # Core fields
+    question_text = Column(Text, nullable=False)
+    question_type = Column(SQLEnum(QuestionTypeEnum), nullable=False, default=QuestionTypeEnum.MCQ)
+    options = Column(JSON, nullable=True)  # For MCQ: [{text, is_correct}, ...]
+    correct_answer = Column(Text, nullable=True)
+    marks = Column(Integer, nullable=False, default=1)
+    negative_marks = Column(Integer, nullable=True, default=0)
+    section = Column(String(100), nullable=True)
+    order_index = Column(Integer, nullable=False, default=0)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    deleted_at = Column(DateTime, nullable=True, index=True)
+    
+    # =========================================================================
+    # RELATIONSHIPS
+    # =========================================================================
+    
+    exam: "Exam" = relationship("Exam", back_populates="questions")
+    
+    def __repr__(self) -> str:
+        return f"<ExamQuestion(id={self.id}, exam_id={self.exam_id})>"
+
+
+class ExamSubmission(Base):
+    """
+    Exam submissions table - Stores student exam submissions (attempts).
+    
+    Fields:
+    - id: Primary key (UUID)
+    - exam_id: Foreign key to exams
+    - student_id: Foreign key to users (students)
+    - started_at: When student began the exam
+    - submitted_at: When submitted
+    - status: Submission status
+    - total_obtained: Marks obtained after grading
+    - graded_by: Faculty who graded
+    - graded_at: When graded
+    - answers: JSON object with answers
+    - device_fingerprint: Unique identifier of device
+    - ip_address: IP address of student
+    - user_agent: Browser/device info
+    - violation_count: Cumulative violation count
+    - is_cheating: Flagged by AI or faculty
+    - proctoring_notes: Notes from proctoring
+    - created_at: Creation timestamp
+    - updated_at: Last update timestamp
+    """
+    
+    __tablename__ = "exam_submissions"
+    __allow_unmapped__ = True
+    
+    # Primary key
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # Foreign keys
+    exam_id = Column(UUID(as_uuid=True), ForeignKey("exams.id"), nullable=False, index=True)
+    student_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    graded_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    
+    # Core fields
+    started_at = Column(DateTime, nullable=False)
+    submitted_at = Column(DateTime, nullable=True)
+    status = Column(SQLEnum(SubmissionStatusEnum), nullable=False, default=SubmissionStatusEnum.IN_PROGRESS, index=True)
+    total_obtained = Column(Integer, nullable=True)
+    graded_at = Column(DateTime, nullable=True)
+    answers = Column(JSON, nullable=True)  # {question_id: answer}
+    device_fingerprint = Column(Text, nullable=True)
+    ip_address = Column(String(50), nullable=True)
+    user_agent = Column(Text, nullable=True)
+    violation_count = Column(Integer, default=0, nullable=False)
+    is_cheating = Column(Boolean, default=False, nullable=False)
+    proctoring_notes = Column(Text, nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # =========================================================================
+    # CONSTRAINTS
+    # =========================================================================
+    
+    __table_args__ = (
+        UniqueConstraint('exam_id', 'student_id', name='uq_exam_submission'),
+    )
+    
+    # =========================================================================
+    # RELATIONSHIPS
+    # =========================================================================
+    
+    exam: "Exam" = relationship("Exam", back_populates="submissions")
+    student: "User" = relationship("User", foreign_keys=[student_id], back_populates=None)
+    grader: "User" = relationship("User", foreign_keys=[graded_by], back_populates=None)
+    
+    def __repr__(self) -> str:
+        return f"<ExamSubmission(id={self.id}, exam_id={self.exam_id}, student_id={self.student_id})>"
+
+
+class Assessment(Base):
+    """
+    Assessments table - Stores assessment information for colleges.
+    
+    Fields:
+    - id: Primary key (UUID)
+    - college_id: Foreign key to colleges
+    - title: Assessment title
+    - description: Assessment description
+    - assessment_type: Type (quiz, assignment, lab)
+    - status: Status (draft, published, closed)
+    - due_at: Submission deadline
+    - total_marks: Total marks
+    - course_id: Optional link to a class/course
+    - allow_retake: Whether retakes are allowed
+    - max_attempts: Maximum number of attempts (null = unlimited)
+    - shuffle_questions: Whether to shuffle questions
+    - created_by: User who created
+    - created_at: Creation timestamp
+    - updated_at: Last update timestamp
+    - deleted_at: Soft delete timestamp
+    """
+    
+    __tablename__ = "assessments"
+    __allow_unmapped__ = True
+    
+    # Primary key
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # Foreign keys
+    college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.id"), nullable=False, index=True)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    course_id = Column(UUID(as_uuid=True), ForeignKey("classes.id"), nullable=True, index=True)
+    
+    # Core fields
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    assessment_type = Column(SQLEnum(AssessmentTypeEnum), nullable=False, default=AssessmentTypeEnum.QUIZ)
+    status = Column(SQLEnum(AssessmentStatusEnum), nullable=False, default=AssessmentStatusEnum.DRAFT, index=True)
+    due_at = Column(DateTime, nullable=True, index=True)
+    total_marks = Column(Integer, nullable=True)
+    allow_retake = Column(Boolean, default=False, nullable=False)
+    max_attempts = Column(Integer, nullable=True)
+    shuffle_questions = Column(Boolean, default=False, nullable=False)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    deleted_at = Column(DateTime, nullable=True, index=True)
+    
+    # =========================================================================
+    # CONSTRAINTS
+    # =========================================================================
+    
+    __table_args__ = (
+        Index('ix_assessment_college_type_due', 'college_id', 'assessment_type', 'due_at'),
+    )
+    
+    # =========================================================================
+    # RELATIONSHIPS
+    # =========================================================================
+    
+    college: "College" = relationship("College", back_populates=None)
+    creator: "User" = relationship("User", back_populates=None)
+    questions = relationship("AssessmentQuestion", back_populates="assessment", cascade="all, delete-orphan")
+    submissions = relationship("AssessmentSubmission", back_populates="assessment", cascade="all, delete-orphan")
+    
+    def __repr__(self) -> str:
+        return f"<Assessment(id={self.id}, title={self.title}, status={self.status})>"
+
+
+class AssessmentQuestion(Base):
+    """
+    Assessment questions table - Stores questions for assessments.
+    
+    Fields:
+    - id: Primary key (UUID)
+    - assessment_id: Foreign key to assessments
+    - question_text: Question content
+    - question_type: Type (mcq, true_false, short_answer, essay)
+    - options: JSON array for MCQ options
+    - correct_answer: Correct answer
+    - marks: Points for this question
+    - order_index: Question order
+    - created_at: Creation timestamp
+    - updated_at: Last update timestamp
+    - deleted_at: Soft delete timestamp
+    """
+    
+    __tablename__ = "assessment_questions"
+    __allow_unmapped__ = True
+    
+    # Primary key
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # Foreign keys
+    assessment_id = Column(UUID(as_uuid=True), ForeignKey("assessments.id"), nullable=False, index=True)
+    
+    # Core fields
+    question_text = Column(Text, nullable=False)
+    question_type = Column(SQLEnum(QuestionTypeEnum), nullable=False, default=QuestionTypeEnum.MCQ)
+    options = Column(JSON, nullable=True)
+    correct_answer = Column(Text, nullable=True)
+    marks = Column(Integer, nullable=False, default=1)
+    order_index = Column(Integer, nullable=False, default=0)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    deleted_at = Column(DateTime, nullable=True, index=True)
+    
+    # =========================================================================
+    # RELATIONSHIPS
+    # =========================================================================
+    
+    assessment: "Assessment" = relationship("Assessment", back_populates="questions")
+    
+    def __repr__(self) -> str:
+        return f"<AssessmentQuestion(id={self.id}, assessment_id={self.assessment_id})>"
+
+
+class AssessmentSubmission(Base):
+    """
+    Assessment submissions table - Stores student assessment submissions.
+    
+    Fields:
+    - id: Primary key (UUID)
+    - assessment_id: Foreign key to assessments
+    - student_id: Foreign key to users (students)
+    - started_at: When student began
+    - submitted_at: When submitted
+    - status: Submission status
+    - total_obtained: Marks obtained after grading
+    - graded_by: Faculty who graded
+    - graded_at: When graded
+    - answers: JSON object with answers
+    - created_at: Creation timestamp
+    - updated_at: Last update timestamp
+    """
+    
+    __tablename__ = "assessment_submissions"
+    __allow_unmapped__ = True
+    
+    # Primary key
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # Foreign keys
+    assessment_id = Column(UUID(as_uuid=True), ForeignKey("assessments.id"), nullable=False, index=True)
+    student_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    graded_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    
+    # Core fields
+    started_at = Column(DateTime, nullable=False)
+    submitted_at = Column(DateTime, nullable=True)
+    status = Column(SQLEnum(SubmissionStatusEnum), nullable=False, default=SubmissionStatusEnum.IN_PROGRESS, index=True)
+    total_obtained = Column(Integer, nullable=True)
+    graded_at = Column(DateTime, nullable=True)
+    answers = Column(JSON, nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # =========================================================================
+    # CONSTRAINTS
+    # =========================================================================
+    
+    __table_args__ = (
+        UniqueConstraint('assessment_id', 'student_id', name='uq_assessment_submission'),
+    )
+    
+    # =========================================================================
+    # RELATIONSHIPS
+    # =========================================================================
+    
+    assessment: "Assessment" = relationship("Assessment", back_populates="submissions")
+    student: "User" = relationship("User", foreign_keys=[student_id], back_populates=None)
+    grader: "User" = relationship("User", foreign_keys=[graded_by], back_populates=None)
+    
+    def __repr__(self) -> str:
+        return f"<AssessmentSubmission(id={self.id}, assessment_id={self.assessment_id}, student_id={self.student_id})>"
+
+
+# =============================================================================
+# STUDENT MANAGEMENT MODELS
+# =============================================================================
+
+class CustomFieldTypeEnum(str, enum.Enum):
+    """Custom field type enumeration for student custom fields."""
+    TEXT = "text"
+    NUMBER = "number"
+    DATE = "date"
+    BOOLEAN = "boolean"
+    SELECT = "select"
+
+
+class Department(Base):
+    """
+    Departments table - stores department information for colleges.
+    
+    Multi-tenant: Each department belongs to a specific college.
+    """
+    
+    __tablename__ = "departments"
+    __allow_unmapped__ = True
+    
+    # Primary key
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # Multi-tenant: college reference
+    college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.id"), nullable=False, index=True)
+    
+    # Core fields
+    name = Column(String(100), nullable=False)
+    code = Column(String(20), nullable=False)
+    description = Column(Text, nullable=True)
+    
+    # Status
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Soft delete
+    deleted_at = Column(DateTime, nullable=True)
+    
+    # =========================================================================
+    # RELATIONSHIPS
+    # =========================================================================
+    
+    # College relationship
+    college: "College" = relationship(
+        "College",
+        back_populates="departments",
+        foreign_keys=[college_id]
+    )
+    
+    # Students in this department
+    students: List["User"] = relationship(
+        "User",
+        back_populates="department",
+        foreign_keys="User.department_id"
+    )
+    
+    def __repr__(self) -> str:
+        return f"<Department(id={self.id}, name={self.name}, code={self.code})>"
+
+
+class CustomFieldDefinition(Base):
+    """
+    Custom Field Definitions table - stores custom field definitions for students.
+    
+    Multi-tenant: Each custom field belongs to a specific college.
+    """
+    
+    __tablename__ = "custom_field_definitions"
+    __allow_unmapped__ = True
+    
+    # Primary key
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # Multi-tenant: college reference
+    college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.id"), nullable=False, index=True)
+    
+    # Core fields
+    name = Column(String(100), nullable=False)
+    field_key = Column(String(100), nullable=False)
+    field_type = Column(String(20), nullable=False)  # CustomFieldTypeEnum stored as string
+    options = Column(JSONB, nullable=True)  # For select type: array of { value, label }
+    is_required = Column(Boolean, default=False, nullable=False)
+    is_filterable = Column(Boolean, default=True, nullable=False)
+    display_order = Column(Integer, default=0, nullable=False)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Soft delete
+    deleted_at = Column(DateTime, nullable=True)
+    
+    # =========================================================================
+    # RELATIONSHIPS
+    # =========================================================================
+    
+    # College relationship
+    college: "College" = relationship(
+        "College",
+        back_populates="custom_field_definitions",
+        foreign_keys=[college_id]
+    )
+    
+    def __repr__(self) -> str:
+        return f"<CustomFieldDefinition(id={self.id}, name={self.name}, field_key={self.field_key})>"
+
+
+# =============================================================================
+# BATCHES
+# =============================================================================
+
+class Batch(Base):
+    """
+    Batches table - stores batch/academic year information for colleges.
+    
+    Multi-tenant: Each batch belongs to a specific college.
+    """
+    
+    __tablename__ = "batches"
+    __allow_unmapped__ = True
+    
+    # Primary key
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # Multi-tenant: college reference
+    college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.id"), nullable=False, index=True)
+    
+    # Core fields
+    name = Column(String(100), nullable=False)
+    academic_year = Column(String(20), nullable=True)
+    start_date = Column(DateTime, nullable=True)
+    end_date = Column(DateTime, nullable=True)
+    
+    # Status
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Soft delete
+    deleted_at = Column(DateTime, nullable=True)
+    
+    # =========================================================================
+    # RELATIONSHIPS
+    # =========================================================================
+    
+    # College relationship
+    college: "College" = relationship("College", back_populates=None)
+    
+    # Students in this batch
+    students = relationship("User", back_populates=None)
+    
+    def __repr__(self) -> str:
+        return f"<Batch(id={self.id}, name={self.name}, academic_year={self.academic_year})>"
+
+
+# =============================================================================
+# EXAM TEMPLATES
+# =============================================================================
+
+class ExamTemplate(Base):
+    """
+    Exam templates table - stores reusable exam configurations.
+    
+    Multi-tenant: Each template belongs to a specific college.
+    """
+    
+    __tablename__ = "exam_templates"
+    __allow_unmapped__ = True
+    
+    # Primary key
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # Multi-tenant: college reference
+    college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.id"), nullable=False, index=True)
+    
+    # Core fields
+    name = Column(String(100), nullable=False)
+    description = Column(Text, nullable=True)
+    duration_minutes = Column(Integer, nullable=True)
+    total_marks = Column(Integer, nullable=True)
+    passing_marks = Column(Integer, nullable=True)
+    shuffle_questions = Column(Boolean, default=False, nullable=False)
+    shuffle_options = Column(Boolean, default=False, nullable=False)
+    allow_navigation = Column(Boolean, default=True, nullable=False)
+    allow_review = Column(Boolean, default=False, nullable=False)
+    show_result_immediately = Column(Boolean, default=False, nullable=False)
+    proctoring_config = Column(JSONB, nullable=True)
+    
+    # Creator
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Soft delete
+    deleted_at = Column(DateTime, nullable=True)
+    
+    # =========================================================================
+    # RELATIONSHIPS
+    # =========================================================================
+    
+    college: "College" = relationship("College", back_populates=None)
+    creator: "User" = relationship("User", back_populates=None)
+    exams = relationship("Exam", back_populates=None)
+    
+    def __repr__(self) -> str:
+        return f"<ExamTemplate(id={self.id}, name={self.name})>"
+
+
+# =============================================================================
+# VIOLATIONS (PROCTORING)
+# =============================================================================
+
+class Violation(Base):
+    """
+    Violations table - stores proctoring violations during exams.
+    """
+    
+    __tablename__ = "violations"
+    __allow_unmapped__ = True
+    
+    # Primary key
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # Foreign key to exam submission
+    exam_submission_id = Column(UUID(as_uuid=True), ForeignKey("exam_submissions.id"), nullable=False, index=True)
+    
+    # Core fields
+    timestamp = Column(DateTime, nullable=False, default=datetime.utcnow)
+    violation_type = Column(SQLEnum(ViolationTypeEnum), nullable=False, index=True)
+    severity = Column(SQLEnum(ViolationSeverityEnum), nullable=False, index=True)
+    details = Column(JSONB, nullable=True)
+    acknowledged = Column(Boolean, default=False, nullable=False, index=True)
+    
+    # Timestamp
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    # =========================================================================
+    # RELATIONSHIPS
+    # =========================================================================
+    
+    exam_submission = relationship("ExamSubmission", back_populates=None)
+    
+    def __repr__(self) -> str:
+        return f"<Violation(id={self.id}, type={self.violation_type}, severity={self.severity})>"
+
+
+# =============================================================================
+# PROCTORING SNAPSHOTS
+# =============================================================================
+
+class ProctoringSnapshot(Base):
+    """
+    Proctoring snapshots table - stores periodic snapshots during exams.
+    """
+    
+    __tablename__ = "proctoring_snapshots"
+    __allow_unmapped__ = True
+    
+    # Primary key
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # Foreign key to exam submission
+    exam_submission_id = Column(UUID(as_uuid=True), ForeignKey("exam_submissions.id"), nullable=False, index=True)
+    
+    # Core fields
+    timestamp = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    image_url = Column(Text, nullable=True)
+    face_data = Column(JSONB, nullable=True)
+    
+    # Timestamp
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    # =========================================================================
+    # RELATIONSHIPS
+    # =========================================================================
+    
+    exam_submission = relationship("ExamSubmission", back_populates=None)
+    
+    def __repr__(self) -> str:
+        return f"<ProctoringSnapshot(id={self.id}, exam_submission_id={self.exam_submission_id})>"
+
+
+# =============================================================================
+# LIVE MONITORING SESSIONS
+# =============================================================================
+
+class LiveMonitoringSession(Base):
+    """
+    Live monitoring sessions table - tracks faculty monitoring of exams.
+    """
+    
+    __tablename__ = "live_monitoring_sessions"
+    __allow_unmapped__ = True
+    
+    # Primary key
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # Foreign keys
+    exam_id = Column(UUID(as_uuid=True), ForeignKey("exams.id"), nullable=False, index=True)
+    faculty_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    
+    # Core fields
+    started_at = Column(DateTime, nullable=False)
+    ended_at = Column(DateTime, nullable=True)
+    
+    # Timestamp
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    # =========================================================================
+    # RELATIONSHIPS
+    # =========================================================================
+    
+    exam: "Exam" = relationship("Exam", back_populates=None)
+    faculty: "User" = relationship("User", back_populates=None)
+    
+    def __repr__(self) -> str:
+        return f"<LiveMonitoringSession(id={self.id}, exam_id={self.exam_id}, faculty_id={self.faculty_id})>"
+
+
+# =============================================================================
+# MONITORING EVENTS
+# =============================================================================
+
+class MonitoringEvent(Base):
+    """
+    Monitoring events table - stores real-time events during exams.
+    """
+    
+    __tablename__ = "monitoring_events"
+    __allow_unmapped__ = True
+    
+    # Primary key
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # Foreign keys
+    exam_id = Column(UUID(as_uuid=True), ForeignKey("exams.id"), nullable=False, index=True)
+    student_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    
+    # Core fields
+    event_type = Column(SQLEnum(MonitoringEventTypeEnum), nullable=False, index=True)
+    details = Column(JSONB, nullable=True)
+    
+    # Timestamp
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    
+    # =========================================================================
+    # RELATIONSHIPS
+    # =========================================================================
+    
+    exam: "Exam" = relationship("Exam", back_populates=None)
+    student: "User" = relationship("User", back_populates=None)
+    
+    def __repr__(self) -> str:
+        return f"<MonitoringEvent(id={self.id}, type={self.event_type}, exam_id={self.exam_id})>"
+
+
+# =============================================================================
+# STUDENT PROGRESS SNAPSHOTS
+# =============================================================================
+
+class StudentProgressSnapshot(Base):
+    """
+    Student progress snapshots table - pre-aggregated daily/weekly performance data.
+    """
+    
+    __tablename__ = "student_progress_snapshots"
+    __allow_unmapped__ = True
+    
+    # Primary key
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # Foreign keys
+    student_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    department_id = Column(UUID(as_uuid=True), ForeignKey("departments.id"), nullable=True, index=True)
+    batch_id = Column(UUID(as_uuid=True), ForeignKey("batches.id"), nullable=True, index=True)
+    
+    # Core fields
+    snapshot_date = Column(DateTime, nullable=False, index=True)
+    exams_taken = Column(Integer, default=0, nullable=False)
+    avg_score = Column(Float, nullable=True)
+    total_violations = Column(Integer, default=0, nullable=False)
+    year = Column(Integer, nullable=True)
+    data = Column(JSONB, nullable=True)
+    
+    # Timestamp
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    # =========================================================================
+    # RELATIONSHIPS
+    # =========================================================================
+    
+    student: "User" = relationship("User", back_populates=None)
+    department: "Department" = relationship("Department", back_populates=None)
+    batch: "Batch" = relationship("Batch", back_populates=None)
+    
+    def __repr__(self) -> str:
+        return f"<StudentProgressSnapshot(id={self.id}, student_id={self.student_id}, date={self.snapshot_date})>"
+
+
 __all__ = [
     "Base",
     "RoleEnum",
@@ -940,4 +1863,32 @@ __all__ = [
     "Note",
     "CollegeFeature",
     "RoleFeaturePermission",
+    # Examination & Assessment models
+    "ExamTypeEnum",
+    "ExamStatusEnum",
+    "AssessmentTypeEnum",
+    "AssessmentStatusEnum",
+    "QuestionTypeEnum",
+    "SubmissionStatusEnum",
+    "ExamAttemptStatusEnum",
+    "ViolationTypeEnum",
+    "ViolationSeverityEnum",
+    "MonitoringEventTypeEnum",
+    "Exam",
+    "ExamQuestion",
+    "ExamSubmission",
+    "Assessment",
+    "AssessmentQuestion",
+    "AssessmentSubmission",
+    "ExamTemplate",
+    "Violation",
+    "ProctoringSnapshot",
+    "LiveMonitoringSession",
+    "MonitoringEvent",
+    "StudentProgressSnapshot",
+    # Student Management models
+    "CustomFieldTypeEnum",
+    "Department",
+    "CustomFieldDefinition",
+    "Batch",
 ]

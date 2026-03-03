@@ -12,7 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.models import (
     User, Class, Enrollment, Session as SessionModel,
-    CollegeFeature, RoleFeaturePermission
+    CollegeFeature, RoleFeaturePermission,
+    Exam, ExamQuestion, ExamSubmission,
+    Assessment, AssessmentQuestion, AssessmentSubmission
 )
 
 
@@ -328,5 +330,308 @@ class CollegeAdminService:
             "total_classes": total_classes,
             "active_sessions": active_sessions,
             "total_students": total_students,
-            "total_faculty": total_faculty
+            "total_faculty": total_faculty,
+            "assessment_module_enabled": True,
+            "exam_module_enabled": True,
+            "total_exams": 0,
+            "total_assessments": 0,
+            "completed_assessments": 0,
+            "pending_assessments": 0
+        }
+    
+    # =============================================================================
+    # EXAM MANAGEMENT
+    # =============================================================================
+    
+    async def get_exams(
+        self,
+        college_id: UUID,
+        skip: int = 0,
+        limit: int = 20,
+        status: Optional[str] = None,
+        exam_type: Optional[str] = None,
+        search: Optional[str] = None
+    ) -> Tuple[List[Exam], int]:
+        """Get all exams for a college with filtering and pagination."""
+        query = select(Exam).where(
+            Exam.college_id == college_id,
+            Exam.deleted_at.is_(None)
+        )
+        
+        if status:
+            query = query.where(Exam.status == status)
+        if exam_type:
+            query = query.where(Exam.exam_type == exam_type)
+        if search:
+            query = query.where(Exam.title.ilike(f"%{search}%"))
+        
+        # Get total count
+        count_result = await self.db.execute(
+            select(func.count()).select_from(query.subquery())
+        )
+        total = count_result.scalar()
+        
+        # Get paginated results
+        query = query.offset(skip).limit(limit).order_by(Exam.created_at.desc())
+        result = await self.db.execute(query)
+        exams = result.scalars().all()
+        
+        return list(exams), total
+    
+    async def get_exam_by_id(self, exam_id: UUID, college_id: UUID) -> Optional[Exam]:
+        """Get an exam by ID within college."""
+        result = await self.db.execute(
+            select(Exam).where(
+                Exam.id == exam_id,
+                Exam.college_id == college_id,
+                Exam.deleted_at.is_(None)
+            )
+        )
+        return result.scalar_one_or_none()
+    
+    async def create_exam(
+        self,
+        college_id: UUID,
+        created_by: UUID,
+        title: str,
+        description: Optional[str] = None,
+        exam_type: str = "quiz",
+        scheduled_at: Optional[datetime] = None,
+        duration_minutes: Optional[int] = None,
+        total_marks: Optional[int] = None,
+        passing_marks: Optional[int] = None,
+        instructions: Optional[str] = None
+    ) -> Exam:
+        """Create a new exam."""
+        exam = Exam(
+            college_id=college_id,
+            created_by=created_by,
+            title=title,
+            description=description,
+            exam_type=exam_type,
+            status="draft",
+            scheduled_at=scheduled_at,
+            duration_minutes=duration_minutes,
+            total_marks=total_marks,
+            passing_marks=passing_marks,
+            instructions=instructions
+        )
+        self.db.add(exam)
+        await self.db.commit()
+        await self.db.refresh(exam)
+        return exam
+    
+    async def update_exam(
+        self,
+        exam: Exam,
+        title: Optional[str] = None,
+        description: Optional[str] = None,
+        exam_type: Optional[str] = None,
+        scheduled_at: Optional[datetime] = None,
+        duration_minutes: Optional[int] = None,
+        total_marks: Optional[int] = None,
+        passing_marks: Optional[int] = None,
+        instructions: Optional[str] = None
+    ) -> Exam:
+        """Update an exam."""
+        if title is not None:
+            exam.title = title
+        if description is not None:
+            exam.description = description
+        if exam_type is not None:
+            exam.exam_type = exam_type
+        if scheduled_at is not None:
+            exam.scheduled_at = scheduled_at
+        if duration_minutes is not None:
+            exam.duration_minutes = duration_minutes
+        if total_marks is not None:
+            exam.total_marks = total_marks
+        if passing_marks is not None:
+            exam.passing_marks = passing_marks
+        if instructions is not None:
+            exam.instructions = instructions
+        
+        await self.db.commit()
+        await self.db.refresh(exam)
+        return exam
+    
+    async def delete_exam(self, exam: Exam) -> None:
+        """Soft delete an exam."""
+        exam.deleted_at = datetime.utcnow()
+        await self.db.commit()
+    
+    async def publish_exam(self, exam: Exam) -> Exam:
+        """Publish an exam (change status to scheduled)."""
+        exam.status = "scheduled"
+        await self.db.commit()
+        await self.db.refresh(exam)
+        return exam
+    
+    async def cancel_exam(self, exam: Exam) -> Exam:
+        """Cancel an exam."""
+        exam.status = "cancelled"
+        await self.db.commit()
+        await self.db.refresh(exam)
+        return exam
+    
+    async def get_exam_stats(self, college_id: UUID) -> dict:
+        """Get exam statistics for a college."""
+        base_query = select(func.count(Exam.id)).where(
+            Exam.college_id == college_id,
+            Exam.deleted_at.is_(None)
+        )
+        
+        total = (await self.db.execute(base_query)).scalar() or 0
+        draft = (await self.db.execute(base_query.where(Exam.status == "draft"))).scalar() or 0
+        scheduled = (await self.db.execute(base_query.where(Exam.status == "scheduled"))).scalar() or 0
+        ongoing = (await self.db.execute(base_query.where(Exam.status == "ongoing"))).scalar() or 0
+        completed = (await self.db.execute(base_query.where(Exam.status == "completed"))).scalar() or 0
+        cancelled = (await self.db.execute(base_query.where(Exam.status == "cancelled"))).scalar() or 0
+        
+        return {
+            "total": total,
+            "draft": draft,
+            "scheduled": scheduled,
+            "ongoing": ongoing,
+            "completed": completed,
+            "cancelled": cancelled
+        }
+    
+    # =============================================================================
+    # ASSESSMENT MANAGEMENT
+    # =============================================================================
+    
+    async def get_assessments(
+        self,
+        college_id: UUID,
+        skip: int = 0,
+        limit: int = 20,
+        status: Optional[str] = None,
+        assessment_type: Optional[str] = None,
+        search: Optional[str] = None
+    ) -> Tuple[List[Assessment], int]:
+        """Get all assessments for a college with filtering and pagination."""
+        query = select(Assessment).where(
+            Assessment.college_id == college_id,
+            Assessment.deleted_at.is_(None)
+        )
+        
+        if status:
+            query = query.where(Assessment.status == status)
+        if assessment_type:
+            query = query.where(Assessment.assessment_type == assessment_type)
+        if search:
+            query = query.where(Assessment.title.ilike(f"%{search}%"))
+        
+        # Get total count
+        count_result = await self.db.execute(
+            select(func.count()).select_from(query.subquery())
+        )
+        total = count_result.scalar()
+        
+        # Get paginated results
+        query = query.offset(skip).limit(limit).order_by(Assessment.created_at.desc())
+        result = await self.db.execute(query)
+        assessments = result.scalars().all()
+        
+        return list(assessments), total
+    
+    async def get_assessment_by_id(self, assessment_id: UUID, college_id: UUID) -> Optional[Assessment]:
+        """Get an assessment by ID within college."""
+        result = await self.db.execute(
+            select(Assessment).where(
+                Assessment.id == assessment_id,
+                Assessment.college_id == college_id,
+                Assessment.deleted_at.is_(None)
+            )
+        )
+        return result.scalar_one_or_none()
+    
+    async def create_assessment(
+        self,
+        college_id: UUID,
+        created_by: UUID,
+        title: str,
+        description: Optional[str] = None,
+        assessment_type: str = "quiz",
+        due_at: Optional[datetime] = None,
+        total_marks: Optional[int] = None
+    ) -> Assessment:
+        """Create a new assessment."""
+        assessment = Assessment(
+            college_id=college_id,
+            created_by=created_by,
+            title=title,
+            description=description,
+            assessment_type=assessment_type,
+            status="draft",
+            due_at=due_at,
+            total_marks=total_marks
+        )
+        self.db.add(assessment)
+        await self.db.commit()
+        await self.db.refresh(assessment)
+        return assessment
+    
+    async def update_assessment(
+        self,
+        assessment: Assessment,
+        title: Optional[str] = None,
+        description: Optional[str] = None,
+        assessment_type: Optional[str] = None,
+        due_at: Optional[datetime] = None,
+        total_marks: Optional[int] = None
+    ) -> Assessment:
+        """Update an assessment."""
+        if title is not None:
+            assessment.title = title
+        if description is not None:
+            assessment.description = description
+        if assessment_type is not None:
+            assessment.assessment_type = assessment_type
+        if due_at is not None:
+            assessment.due_at = due_at
+        if total_marks is not None:
+            assessment.total_marks = total_marks
+        
+        await self.db.commit()
+        await self.db.refresh(assessment)
+        return assessment
+    
+    async def delete_assessment(self, assessment: Assessment) -> None:
+        """Soft delete an assessment."""
+        assessment.deleted_at = datetime.utcnow()
+        await self.db.commit()
+    
+    async def publish_assessment(self, assessment: Assessment) -> Assessment:
+        """Publish an assessment."""
+        assessment.status = "published"
+        await self.db.commit()
+        await self.db.refresh(assessment)
+        return assessment
+    
+    async def close_assessment(self, assessment: Assessment) -> Assessment:
+        """Close an assessment."""
+        assessment.status = "closed"
+        await self.db.commit()
+        await self.db.refresh(assessment)
+        return assessment
+    
+    async def get_assessment_stats(self, college_id: UUID) -> dict:
+        """Get assessment statistics for a college."""
+        base_query = select(func.count(Assessment.id)).where(
+            Assessment.college_id == college_id,
+            Assessment.deleted_at.is_(None)
+        )
+        
+        total = (await self.db.execute(base_query)).scalar() or 0
+        draft = (await self.db.execute(base_query.where(Assessment.status == "draft"))).scalar() or 0
+        published = (await self.db.execute(base_query.where(Assessment.status == "published"))).scalar() or 0
+        closed = (await self.db.execute(base_query.where(Assessment.status == "closed"))).scalar() or 0
+        
+        return {
+            "total": total,
+            "draft": draft,
+            "published": published,
+            "closed": closed
         }

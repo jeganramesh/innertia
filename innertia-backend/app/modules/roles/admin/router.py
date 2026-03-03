@@ -6,6 +6,7 @@ Handles platform-wide administrative operations for admins.
 from typing import Optional, List
 from uuid import UUID
 from datetime import datetime
+from pydantic import BaseModel
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Form
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +20,18 @@ from app.accounts.dependencies import get_current_user
 from app.accounts.utils import hash_password
 from app.modules.platform.admin.service import AnalyticsService
 from app.modules.platform.admin.schemas import PlatformAnalyticsResponse
+
+
+# =============================================================================
+# SCHEMAS
+# =============================================================================
+
+class UserUpdateRequest(BaseModel):
+    """Request to update a user."""
+    full_name: Optional[str] = None
+    role: Optional[str] = None
+    is_active: Optional[bool] = None
+    college_id: Optional[UUID] = None
 
 
 router = APIRouter(
@@ -307,11 +320,17 @@ async def create_admin_user(
                 detail="College not found"
             )
     
-    # Check if email exists
+    # Check if email exists (including soft-deleted users due to DB unique constraint)
     existing = await db.execute(
         select(User).where(User.email == email)
     )
-    if existing.scalar_one_or_none():
+    existing_user = existing.scalar_one_or_none()
+    if existing_user:
+        if existing_user.deleted_at is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="User with this email already exists but was previously deleted. Contact support to restore the account."
+            )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="User with this email already exists"
@@ -402,10 +421,7 @@ async def list_admin_users(
 @router.patch("/users/{user_id}")
 async def update_admin_user(
     user_id: UUID,
-    full_name: Optional[str] = None,
-    role: Optional[str] = None,
-    is_active: Optional[bool] = None,
-    college_id: Optional[UUID] = None,
+    request: UserUpdateRequest,
     current_user: User = Depends(require_roles("admin")),
     db: AsyncSession = Depends(get_db)
 ):
@@ -423,7 +439,7 @@ async def update_admin_user(
         )
     
     # Prevent changing own role
-    if user.id == current_user.id and role is not None:
+    if user.id == current_user.id and request.role is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot change your own role"
@@ -434,27 +450,27 @@ async def update_admin_user(
     old_is_active = user.is_active
     old_college_id = user.college_id
     
-    if full_name is not None:
-        user.full_name = full_name
-    if role is not None:
+    if request.full_name is not None:
+        user.full_name = request.full_name
+    if request.role is not None:
         valid_roles = ["admin", "college_admin", "staff", "faculty", "trainer", "student"]
-        if role not in valid_roles:
+        if request.role not in valid_roles:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid role. Must be one of: {', '.join(valid_roles)}"
             )
-        user.role = role
-    if is_active is not None:
-        user.is_active = is_active
-    if college_id is not None:
-        user.college_id = college_id
+        user.role = request.role
+    if request.is_active is not None:
+        user.is_active = request.is_active
+    if request.college_id is not None:
+        user.college_id = request.college_id
     
     user.updated_at = datetime.utcnow()
     await db.commit()
     await db.refresh(user)
     
     # Create audit log entries for role changes
-    if role is not None and role != old_role:
+    if request.role is not None and request.role != old_role:
         await create_audit_log(
             db=db,
             action="USER_ROLE_CHANGE",
@@ -465,13 +481,13 @@ async def update_admin_user(
             metadata={
                 "user_email": user.email,
                 "old_role": old_role,
-                "new_role": role
+                "new_role": request.role
             }
         )
         await db.commit()
     
     # Create audit log entries for is_active changes
-    if is_active is not None and is_active != old_is_active:
+    if request.is_active is not None and request.is_active != old_is_active:
         await create_audit_log(
             db=db,
             action="USER_ACTIVE_TOGGLE",
@@ -482,13 +498,13 @@ async def update_admin_user(
             metadata={
                 "user_email": user.email,
                 "old_is_active": old_is_active,
-                "new_is_active": is_active
+                "new_is_active": request.is_active
             }
         )
         await db.commit()
     
     # Create audit log entries for college assignment changes
-    if college_id is not None and college_id != old_college_id:
+    if request.college_id is not None and request.college_id != old_college_id:
         old_college_name = None
         new_college_name = None
         if old_college_id:
@@ -496,8 +512,8 @@ async def update_admin_user(
             old_college = result.scalar_one_or_none()
             if old_college:
                 old_college_name = old_college.name
-        if college_id:
-            result = await db.execute(select(College).where(College.id == college_id))
+        if request.college_id:
+            result = await db.execute(select(College).where(College.id == request.college_id))
             new_college = result.scalar_one_or_none()
             if new_college:
                 new_college_name = new_college.name
@@ -508,12 +524,12 @@ async def update_admin_user(
             performed_by=current_user.id,
             target_type="User",
             target_id=str(user.id),
-            college_id=college_id,
+            college_id=request.college_id,
             metadata={
                 "user_email": user.email,
                 "old_college_id": str(old_college_id) if old_college_id else None,
                 "old_college_name": old_college_name,
-                "new_college_id": str(college_id) if college_id else None,
+                "new_college_id": str(request.college_id) if request.college_id else None,
                 "new_college_name": new_college_name
             }
         )
@@ -525,7 +541,8 @@ async def update_admin_user(
         "full_name": user.full_name,
         "role": user.role,
         "college_id": str(user.college_id) if user.college_id else None,
-        "is_active": user.is_active
+        "is_active": user.is_active,
+        "created_at": user.created_at.isoformat()
     }
 
 

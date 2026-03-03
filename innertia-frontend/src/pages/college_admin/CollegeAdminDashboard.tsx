@@ -15,7 +15,11 @@ import {
   Video,
   Activity,
   TrendingUp,
-  Loader2
+  Loader2,
+  FileText,
+  Clipboard,
+  CheckCircle,
+  Clock
 } from 'lucide-react';
 
 interface CollegeStats {
@@ -28,6 +32,12 @@ interface CollegeStats {
   sessions_today: number;
   sessions_last_7_days: number;
   participation_rate: number;
+  assessment_module_enabled: boolean;
+  exam_module_enabled: boolean;
+  total_exams: number;
+  total_assessments: number;
+  completed_assessments: number;
+  pending_assessments: number;
 }
 
 interface DailyTrend {
@@ -54,6 +64,11 @@ export const CollegeAdminDashboard = () => {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const getErrorMessage = (err: unknown): string => {
+    if (err instanceof Error) return err.message;
+    return 'Failed to load dashboard';
+  };
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -97,9 +112,9 @@ export const CollegeAdminDashboard = () => {
         }
         
         setData(data);
-      } catch (err: any) {
+      } catch (err) {
         console.error('Error fetching dashboard:', err);
-        setError(err.message || 'Failed to load dashboard');
+        setError(getErrorMessage(err));
       } finally {
         setLoading(false);
       }
@@ -252,8 +267,8 @@ export const CollegeAdminDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="h-48 flex items-end gap-2">
-              {data.analytics.daily_trends.map((day, index) => {
-                const maxSessions = Math.max(...data.analytics.daily_trends.map(d => d.sessions), 1);
+              {data.analytics!.daily_trends.map((day, index) => {
+                const maxSessions = Math.max(...data.analytics!.daily_trends.map(d => d.sessions), 1);
                 const height = (day.sessions / maxSessions) * 100;
                 
                 return (
@@ -337,6 +352,70 @@ export const CollegeAdminDashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Exam/Assessment Stats - Show when exam module is enabled - MOVED TO BOTTOM */}
+      {(stats?.exam_module_enabled || stats?.assessment_module_enabled) && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-bold text-gray-900">Examinations & Assessments</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Total Exams */}
+            <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-indigo-200">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-indigo-700 flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  Total Exams
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-indigo-900">{stats?.total_exams || 0}</div>
+                <p className="text-xs text-indigo-600 mt-1">Scheduled exams</p>
+              </CardContent>
+            </Card>
+
+            {/* Total Assessments */}
+            <Card className="bg-gradient-to-br from-teal-50 to-teal-100 border-teal-200">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-teal-700 flex items-center gap-2">
+                  <Clipboard className="w-4 h-4" />
+                  Assessments
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-teal-900">{stats?.total_assessments || 0}</div>
+                <p className="text-xs text-teal-600 mt-1">Total assessments</p>
+              </CardContent>
+            </Card>
+
+            {/* Completed Assessments */}
+            <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-emerald-700 flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4" />
+                  Completed
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-emerald-900">{stats?.completed_assessments || 0}</div>
+                <p className="text-xs text-emerald-600 mt-1">Submitted</p>
+              </CardContent>
+            </Card>
+
+            {/* Pending Assessments */}
+            <Card className="bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-amber-700 flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  Pending
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-amber-900">{stats?.pending_assessments || 0}</div>
+                <p className="text-xs text-amber-600 mt-1">Awaiting submission</p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

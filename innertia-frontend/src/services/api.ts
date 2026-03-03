@@ -24,7 +24,7 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 const CHUNK_SIZE = 5 * 1024 * 1024;
 
 class ApiService {
-  private client: AxiosInstance;
+  public client: AxiosInstance;
 
   constructor() {
     this.client = axios.create({
@@ -322,3 +322,5 @@ export const {
   getFacultyStats,
   healthCheck,
 } = apiService;
+
+export const { client: api } = apiService;

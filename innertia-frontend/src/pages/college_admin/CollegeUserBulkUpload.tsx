@@ -22,7 +22,7 @@ interface BulkUploadResponse {
 }
 
 export const CollegeUserBulkUpload = () => {
-  const { token } = useAuth();
+  const token = localStorage.getItem('access_token');
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [result, setResult] = useState<BulkUploadResponse | null>(null);
@@ -132,7 +132,7 @@ export const CollegeUserBulkUpload = () => {
   // Download template - college admin version (only student, staff, faculty, trainer)
   const handleDownloadTemplate = () => {
     const csvContent = 'full_name,email,role,password,is_active\nJohn Doe,john.doe@college.edu,student,changeme123,true\nJane Smith,jane.smith@college.edu,faculty,changeme123,true\nBob Wilson,bob.wilson@college.edu,staff,changeme123,true\nAlice Brown,alice.brown@college.edu,trainer,changeme123,true';
-    const blob = new Blob([csvContent], { type,trainer,chang: 'text/csv' });
+    const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

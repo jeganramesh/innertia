@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers
-revision = '007'
+revision = '007_add_college_domain'
 down_revision = '006'
 branch_labels = None
 depends_on = None

@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_
 
 from app.core.database import get_db
-from app.models.models import User, College, Class, Session as SessionModel, Enrollment, SlideActivity, AuditLog
+from app.models.models import User, College, Class, Session as SessionModel, Enrollment, SlideActivity, AuditLog, Department, CustomFieldDefinition
 from app.shared.permissions import require_roles, require_permission, verify_college_access
 from app.shared.audit_helpers import create_audit_log
 from app.accounts.dependencies import get_current_user
@@ -20,8 +20,18 @@ from app.accounts.utils import hash_password
 from app.core.feature_guard import PLATFORM_FEATURES, FeatureGuard
 from app.modules.roles.college_admin.schemas import (
     UserCreateRequest, UserUpdateRequest, UserResponse, UserListResponse, UserBulkCreateRequest,
-    AuditLogResponse, AuditLogListResponse, BulkUploadResponse
+    AuditLogResponse, AuditLogListResponse, BulkUploadResponse,
+    # Exam schemas
+    ExamCreate, ExamUpdate, ExamResponse, ExamListResponse, ExamStats,
+    # Assessment schemas
+    AssessmentCreate, AssessmentUpdate, AssessmentResponse, AssessmentListResponse, AssessmentStats
 )
+from app.modules.roles.college_admin.service import CollegeAdminService
+
+
+def get_service(db: AsyncSession = Depends(get_db)) -> CollegeAdminService:
+    """Dependency to get CollegeAdminService instance."""
+    return CollegeAdminService(db)
 
 
 router = APIRouter(
@@ -123,6 +133,16 @@ async def college_admin_dashboard(
     total_students = user_counts.get("student", 0)
     participation_rate = round((active_students / total_students * 100), 1) if total_students > 0 else 0
     
+    # Check if exam and assessment modules are enabled
+    guard = FeatureGuard(db, current_user)
+    try:
+        college_features = await guard._load_college_features()
+        exam_module_enabled = college_features.get("exam_module", True)  # Default to True
+        assessment_module_enabled = college_features.get("assessment_module", True)  # Default to True
+    except:
+        exam_module_enabled = True  # Default to enabled if feature check fails
+        assessment_module_enabled = True
+    
     # Build base response
     response = {
         "college": {
@@ -139,7 +159,13 @@ async def college_admin_dashboard(
             "classes": class_count,
             "sessions_today": active_sessions_today,
             "sessions_last_7_days": sessions_last_7_days,
-            "participation_rate": participation_rate
+            "participation_rate": participation_rate,
+            "exam_module_enabled": exam_module_enabled,
+            "assessment_module_enabled": assessment_module_enabled,
+            "total_exams": 0,  # Placeholder - to be implemented with actual exam data
+            "total_assessments": 0,  # Placeholder - to be implemented with actual assessment data
+            "completed_assessments": 0,  # Placeholder
+            "pending_assessments": 0  # Placeholder
         }
     }
     
@@ -227,15 +253,73 @@ async def create_college_user(
             detail="Cannot create users. College is not active."
         )
     
-    # Check if email exists
+    # Check if email exists (including soft-deleted users due to DB unique constraint)
     existing = await db.execute(
         select(User).where(User.email == request.email)
     )
-    if existing.scalar_one_or_none():
+    existing_user = existing.scalar_one_or_none()
+    if existing_user:
+        if existing_user.deleted_at is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="User with this email already exists but was previously deleted. Contact support to restore the account."
+            )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="User with this email already exists"
         )
+    
+    # Validate student-specific fields
+    if request.role == "student":
+        # Validate department_id belongs to this college
+        if request.department_id:
+            dept_result = await db.execute(
+                select(Department).where(
+                    Department.id == request.department_id,
+                    Department.college_id == current_user.college_id,
+                    Department.deleted_at == None
+                )
+            )
+            if not dept_result.scalar_one_or_none():
+                raise HTTPException(status_code=400, detail="Invalid department ID")
+        
+        # Validate register_number uniqueness within college
+        if request.register_number:
+            reg_result = await db.execute(
+                select(User).where(
+                    User.college_id == current_user.college_id,
+                    User.register_number == request.register_number.upper(),
+                    User.deleted_at == None
+                )
+            )
+            if reg_result.scalar_one_or_none():
+                raise HTTPException(status_code=400, detail="Register number already exists in this college")
+        
+        # Validate custom_fields against definitions
+        if request.custom_fields:
+            # Get all custom field definitions for this college
+            fields_result = await db.execute(
+                select(CustomFieldDefinition).where(
+                    CustomFieldDefinition.college_id == current_user.college_id,
+                    CustomFieldDefinition.deleted_at == None
+                )
+            )
+            field_definitions = {f.field_key: f for f in fields_result.scalars().all()}
+            
+            for key, value in request.custom_fields.items():
+                if key not in field_definitions:
+                    raise HTTPException(status_code=400, detail=f"Unknown custom field: {key}")
+                field_def = field_definitions[key]
+                
+                # Validate required fields
+                if field_def.is_required and value is None:
+                    raise HTTPException(status_code=400, detail=f"Custom field {key} is required")
+                
+                # Validate select field options
+                if field_def.field_type == "select" and field_def.options:
+                    valid_options = [opt["value"] for opt in field_def.options]
+                    if value not in valid_options:
+                        raise HTTPException(status_code=400, detail=f"Invalid option for {key}")
     
     # Create user
     user = User(
@@ -244,7 +328,12 @@ async def create_college_user(
         password_hash=hash_password(request.password),
         role=request.role,
         college_id=current_user.college_id,
-        is_active=request.is_active
+        is_active=request.is_active,
+        department_id=request.department_id if request.role == "student" else None,
+        current_year=request.current_year if request.role == "student" else None,
+        section=request.section if request.role == "student" else None,
+        register_number=request.register_number if request.role == "student" else None,
+        custom_fields=request.custom_fields if request.role == "student" else None
     )
     db.add(user)
     
@@ -283,6 +372,11 @@ async def list_college_users(
     role: Optional[str] = None,
     search: Optional[str] = None,
     is_active: Optional[bool] = None,
+    # Student-specific filters
+    department_id: Optional[UUID] = Query(None, description="Filter by department"),
+    current_year: Optional[int] = Query(None, description="Filter by year"),
+    section: Optional[str] = Query(None, description="Filter by section"),
+    register_number: Optional[str] = Query(None, description="Search by register number"),
     current_user: User = Depends(require_roles("college_admin")),
     db: AsyncSession = Depends(get_db)
 ):
@@ -305,6 +399,16 @@ async def list_college_users(
             )
         )
     
+    # Student-specific filters
+    if department_id:
+        query = query.where(User.department_id == department_id)
+    if current_year:
+        query = query.where(User.current_year == current_year)
+    if section:
+        query = query.where(User.section == section.upper())
+    if register_number:
+        query = query.where(User.register_number.ilike(f"%{register_number}%"))
+    
     # Get total count
     count_result = await db.execute(select(func.count()).select_from(query.subquery()))
     total = count_result.scalar()
@@ -314,18 +418,37 @@ async def list_college_users(
     result = await db.execute(query)
     users = result.scalars().all()
     
+    # Get department info for students
+    user_items = []
+    for u in users:
+        user_dict = {
+            "id": str(u.id),
+            "email": u.email,
+            "name": u.full_name,
+            "role": u.role,
+            "is_active": u.is_active,
+            "created_at": u.created_at.isoformat(),
+            "department_id": u.department_id,
+            "department_name": None,
+            "current_year": u.current_year,
+            "section": u.section,
+            "register_number": u.register_number,
+            "custom_fields": u.custom_fields
+        }
+        
+        # Get department name if available
+        if u.department_id:
+            dept_result = await db.execute(
+                select(Department).where(Department.id == u.department_id)
+            )
+            dept = dept_result.scalar_one_or_none()
+            if dept:
+                user_dict["department_name"] = dept.name
+        
+        user_items.append(user_dict)
+    
     return {
-        "items": [
-            {
-                "id": str(u.id),
-                "email": u.email,
-                "name": u.full_name,
-                "role": u.role,
-                "is_active": u.is_active,
-                "created_at": u.created_at.isoformat()
-            }
-            for u in users
-        ],
+        "items": user_items,
         "total": total,
         "page": skip // limit + 1,
         "page_size": limit,
@@ -1785,3 +1908,598 @@ async def bulk_upload_users(
         "updated_count": updated_count,
         "failed_rows": failed_rows
     }
+
+
+# =============================================================================
+# EXAM ENDPOINTS
+# =============================================================================
+
+@router.get("/exams", response_model=ExamListResponse)
+async def get_exams(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    status: Optional[str] = None,
+    exam_type: Optional[str] = None,
+    search: Optional[str] = None,
+    current_user: User = Depends(require_roles("college_admin")),
+    service: CollegeAdminService = Depends(get_service)
+):
+    """Get all exams for the college with filtering and pagination."""
+    college_id = current_user.college_id
+    if college_id is None:
+        raise HTTPException(status_code=400, detail="No college assigned to this user")
+    
+    skip = (page - 1) * limit
+    exams, total = await service.get_exams(
+        college_id=college_id,
+        skip=skip,
+        limit=limit,
+        status=status,
+        exam_type=exam_type,
+        search=search
+    )
+    
+    pages = (total + limit - 1) // limit
+    
+    items = []
+    for exam in exams:
+        items.append(ExamResponse(
+            id=exam.id,
+            college_id=exam.college_id,
+            title=exam.title,
+            description=exam.description,
+            exam_type=exam.exam_type.value if hasattr(exam.exam_type, 'value') else exam.exam_type,
+            status=exam.status.value if hasattr(exam.status, 'value') else exam.status,
+            scheduled_at=exam.scheduled_at,
+            duration_minutes=exam.duration_minutes,
+            total_marks=exam.total_marks,
+            passing_marks=exam.passing_marks,
+            instructions=exam.instructions,
+            created_by=exam.created_by,
+            created_at=exam.created_at,
+            updated_at=exam.updated_at,
+            question_count=len(exam.questions) if exam.questions else 0
+        ))
+    
+    return ExamListResponse(
+        items=items,
+        total=total,
+        page=page,
+        limit=limit,
+        pages=pages
+    )
+
+
+@router.get("/exams/{exam_id}", response_model=ExamResponse)
+async def get_exam(
+    exam_id: UUID,
+    current_user: User = Depends(require_roles("college_admin")),
+    service: CollegeAdminService = Depends(get_service)
+):
+    """Get a single exam by ID."""
+    college_id = current_user.college_id
+    if college_id is None:
+        raise HTTPException(status_code=400, detail="No college assigned to this user")
+    
+    exam = await service.get_exam_by_id(exam_id, college_id)
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    return ExamResponse(
+        id=exam.id,
+        college_id=exam.college_id,
+        title=exam.title,
+        description=exam.description,
+        exam_type=exam.exam_type.value if hasattr(exam.exam_type, 'value') else exam.exam_type,
+        status=exam.status.value if hasattr(exam.status, 'value') else exam.status,
+        scheduled_at=exam.scheduled_at,
+        duration_minutes=exam.duration_minutes,
+        total_marks=exam.total_marks,
+        passing_marks=exam.passing_marks,
+        instructions=exam.instructions,
+        created_by=exam.created_by,
+        created_at=exam.created_at,
+        updated_at=exam.updated_at,
+        question_count=len(exam.questions) if exam.questions else 0
+    )
+
+
+@router.post("/exams", response_model=ExamResponse, status_code=201)
+async def create_exam(
+    data: ExamCreate,
+    current_user: User = Depends(require_roles("college_admin")),
+    service: CollegeAdminService = Depends(get_service)
+):
+    """Create a new exam."""
+    college_id = current_user.college_id
+    if college_id is None:
+        raise HTTPException(status_code=400, detail="No college assigned to this user")
+    
+    # Validate exam_type - only mcq and coding are allowed
+    valid_exam_types = ["mcq", "coding"]
+    if data.exam_type not in valid_exam_types:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid exam_type. Must be one of: {', '.join(valid_exam_types)}"
+        )
+    
+    exam = await service.create_exam(
+        college_id=college_id,
+        created_by=current_user.id,
+        title=data.title,
+        description=data.description,
+        exam_type=data.exam_type,
+        scheduled_at=data.scheduled_at,
+        duration_minutes=data.duration_minutes,
+        total_marks=data.total_marks,
+        passing_marks=data.passing_marks,
+        instructions=data.instructions
+    )
+    
+    return ExamResponse(
+        id=exam.id,
+        college_id=exam.college_id,
+        title=exam.title,
+        description=exam.description,
+        exam_type=exam.exam_type.value if hasattr(exam.exam_type, 'value') else exam.exam_type,
+        status=exam.status.value if hasattr(exam.status, 'value') else exam.status,
+        scheduled_at=exam.scheduled_at,
+        duration_minutes=exam.duration_minutes,
+        total_marks=exam.total_marks,
+        passing_marks=exam.passing_marks,
+        instructions=exam.instructions,
+        created_by=exam.created_by,
+        created_at=exam.created_at,
+        updated_at=exam.updated_at,
+        question_count=0
+    )
+
+
+@router.patch("/exams/{exam_id}", response_model=ExamResponse)
+async def update_exam(
+    exam_id: UUID,
+    data: ExamUpdate,
+    current_user: User = Depends(require_roles("college_admin")),
+    service: CollegeAdminService = Depends(get_service)
+):
+    """Update an exam."""
+    college_id = current_user.college_id
+    if college_id is None:
+        raise HTTPException(status_code=400, detail="No college assigned to this user")
+    
+    exam = await service.get_exam_by_id(exam_id, college_id)
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    # Check if exam can be edited (only draft or scheduled)
+    if exam.status not in ["draft", "scheduled"]:
+        raise HTTPException(status_code=400, detail="Cannot edit exam in current status")
+    
+    # Validate exam_type if provided - only mcq and coding are allowed
+    if data.exam_type is not None:
+        valid_exam_types = ["mcq", "coding"]
+        if data.exam_type not in valid_exam_types:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid exam_type. Must be one of: {', '.join(valid_exam_types)}"
+            )
+    
+    exam = await service.update_exam(
+        exam=exam,
+        title=data.title,
+        description=data.description,
+        exam_type=data.exam_type,
+        scheduled_at=data.scheduled_at,
+        duration_minutes=data.duration_minutes,
+        total_marks=data.total_marks,
+        passing_marks=data.passing_marks,
+        instructions=data.instructions
+    )
+    
+    return ExamResponse(
+        id=exam.id,
+        college_id=exam.college_id,
+        title=exam.title,
+        description=exam.description,
+        exam_type=exam.exam_type.value if hasattr(exam.exam_type, 'value') else exam.exam_type,
+        status=exam.status.value if hasattr(exam.status, 'value') else exam.status,
+        scheduled_at=exam.scheduled_at,
+        duration_minutes=exam.duration_minutes,
+        total_marks=exam.total_marks,
+        passing_marks=exam.passing_marks,
+        instructions=exam.instructions,
+        created_by=exam.created_by,
+        created_at=exam.created_at,
+        updated_at=exam.updated_at,
+        question_count=len(exam.questions) if exam.questions else 0
+    )
+
+
+@router.delete("/exams/{exam_id}", status_code=204)
+async def delete_exam(
+    exam_id: UUID,
+    current_user: User = Depends(require_roles("college_admin")),
+    service: CollegeAdminService = Depends(get_service)
+):
+    """Soft delete an exam."""
+    college_id = current_user.college_id
+    if college_id is None:
+        raise HTTPException(status_code=400, detail="No college assigned to this user")
+    
+    exam = await service.get_exam_by_id(exam_id, college_id)
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    # Check if there are submissions
+    if exam.submissions and len(exam.submissions) > 0:
+        raise HTTPException(status_code=400, detail="Cannot delete exam with submissions")
+    
+    await service.delete_exam(exam)
+
+
+@router.post("/exams/{exam_id}/publish", response_model=ExamResponse)
+async def publish_exam(
+    exam_id: UUID,
+    current_user: User = Depends(require_roles("college_admin")),
+    service: CollegeAdminService = Depends(get_service)
+):
+    """Publish an exam (change status to scheduled)."""
+    college_id = current_user.college_id
+    if college_id is None:
+        raise HTTPException(status_code=400, detail="No college assigned to this user")
+    
+    exam = await service.get_exam_by_id(exam_id, college_id)
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    if exam.status != "draft":
+        raise HTTPException(status_code=400, detail="Only draft exams can be published")
+    
+    exam = await service.publish_exam(exam)
+    
+    return ExamResponse(
+        id=exam.id,
+        college_id=exam.college_id,
+        title=exam.title,
+        description=exam.description,
+        exam_type=exam.exam_type.value if hasattr(exam.exam_type, 'value') else exam.exam_type,
+        status=exam.status.value if hasattr(exam.status, 'value') else exam.status,
+        scheduled_at=exam.scheduled_at,
+        duration_minutes=exam.duration_minutes,
+        total_marks=exam.total_marks,
+        passing_marks=exam.passing_marks,
+        instructions=exam.instructions,
+        created_by=exam.created_by,
+        created_at=exam.created_at,
+        updated_at=exam.updated_at,
+        question_count=len(exam.questions) if exam.questions else 0
+    )
+
+
+@router.post("/exams/{exam_id}/cancel", response_model=ExamResponse)
+async def cancel_exam(
+    exam_id: UUID,
+    current_user: User = Depends(require_roles("college_admin")),
+    service: CollegeAdminService = Depends(get_service)
+):
+    """Cancel an exam."""
+    college_id = current_user.college_id
+    if college_id is None:
+        raise HTTPException(status_code=400, detail="No college assigned to this user")
+    
+    exam = await service.get_exam_by_id(exam_id, college_id)
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    if exam.status == "cancelled":
+        raise HTTPException(status_code=400, detail="Exam is already cancelled")
+    
+    exam = await service.cancel_exam(exam)
+    
+    return ExamResponse(
+        id=exam.id,
+        college_id=exam.college_id,
+        title=exam.title,
+        description=exam.description,
+        exam_type=exam.exam_type.value if hasattr(exam.exam_type, 'value') else exam.exam_type,
+        status=exam.status.value if hasattr(exam.status, 'value') else exam.status,
+        scheduled_at=exam.scheduled_at,
+        duration_minutes=exam.duration_minutes,
+        total_marks=exam.total_marks,
+        passing_marks=exam.passing_marks,
+        instructions=exam.instructions,
+        created_by=exam.created_by,
+        created_at=exam.created_at,
+        updated_at=exam.updated_at,
+        question_count=len(exam.questions) if exam.questions else 0
+    )
+
+
+@router.get("/dashboard/exam-stats", response_model=ExamStats)
+async def get_exam_stats(
+    current_user: User = Depends(require_roles("college_admin")),
+    service: CollegeAdminService = Depends(get_service)
+):
+    """Get exam statistics for the college."""
+    college_id = current_user.college_id
+    if college_id is None:
+        raise HTTPException(status_code=400, detail="No college assigned to this user")
+    
+    stats = await service.get_exam_stats(college_id)
+    return ExamStats(**stats)
+
+
+# =============================================================================
+# ASSESSMENT ENDPOINTS
+# =============================================================================
+
+@router.get("/assessments", response_model=AssessmentListResponse)
+async def get_assessments(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    status: Optional[str] = None,
+    assessment_type: Optional[str] = None,
+    search: Optional[str] = None,
+    current_user: User = Depends(require_roles("college_admin")),
+    service: CollegeAdminService = Depends(get_service)
+):
+    """Get all assessments for the college with filtering and pagination."""
+    college_id = current_user.college_id
+    if college_id is None:
+        raise HTTPException(status_code=400, detail="No college assigned to this user")
+    
+    skip = (page - 1) * limit
+    assessments, total = await service.get_assessments(
+        college_id=college_id,
+        skip=skip,
+        limit=limit,
+        status=status,
+        assessment_type=assessment_type,
+        search=search
+    )
+    
+    pages = (total + limit - 1) // limit
+    
+    items = []
+    for assessment in assessments:
+        items.append(AssessmentResponse(
+            id=assessment.id,
+            college_id=assessment.college_id,
+            title=assessment.title,
+            description=assessment.description,
+            assessment_type=assessment.assessment_type.value if hasattr(assessment.assessment_type, 'value') else assessment.assessment_type,
+            status=assessment.status.value if hasattr(assessment.status, 'value') else assessment.status,
+            due_at=assessment.due_at,
+            total_marks=assessment.total_marks,
+            created_by=assessment.created_by,
+            created_at=assessment.created_at,
+            updated_at=assessment.updated_at,
+            question_count=len(assessment.questions) if assessment.questions else 0
+        ))
+    
+    return AssessmentListResponse(
+        items=items,
+        total=total,
+        page=page,
+        limit=limit,
+        pages=pages
+    )
+
+
+@router.get("/assessments/{assessment_id}", response_model=AssessmentResponse)
+async def get_assessment(
+    assessment_id: UUID,
+    current_user: User = Depends(require_roles("college_admin")),
+    service: CollegeAdminService = Depends(get_service)
+):
+    """Get a single assessment by ID."""
+    college_id = current_user.college_id
+    if college_id is None:
+        raise HTTPException(status_code=400, detail="No college assigned to this user")
+    
+    assessment = await service.get_assessment_by_id(assessment_id, college_id)
+    if not assessment:
+        raise HTTPException(status_code=404, detail="Assessment not found")
+    
+    return AssessmentResponse(
+        id=assessment.id,
+        college_id=assessment.college_id,
+        title=assessment.title,
+        description=assessment.description,
+        assessment_type=assessment.assessment_type.value if hasattr(assessment.assessment_type, 'value') else assessment.assessment_type,
+        status=assessment.status.value if hasattr(assessment.status, 'value') else assessment.status,
+        due_at=assessment.due_at,
+        total_marks=assessment.total_marks,
+        created_by=assessment.created_by,
+        created_at=assessment.created_at,
+        updated_at=assessment.updated_at,
+        question_count=len(assessment.questions) if assessment.questions else 0
+    )
+
+
+@router.post("/assessments", response_model=AssessmentResponse, status_code=201)
+async def create_assessment(
+    data: AssessmentCreate,
+    current_user: User = Depends(require_roles("college_admin")),
+    service: CollegeAdminService = Depends(get_service)
+):
+    """Create a new assessment."""
+    college_id = current_user.college_id
+    if college_id is None:
+        raise HTTPException(status_code=400, detail="No college assigned to this user")
+    
+    assessment = await service.create_assessment(
+        college_id=college_id,
+        created_by=current_user.id,
+        title=data.title,
+        description=data.description,
+        assessment_type=data.assessment_type,
+        due_at=data.due_at,
+        total_marks=data.total_marks
+    )
+    
+    return AssessmentResponse(
+        id=assessment.id,
+        college_id=assessment.college_id,
+        title=assessment.title,
+        description=assessment.description,
+        assessment_type=assessment.assessment_type.value if hasattr(assessment.assessment_type, 'value') else assessment.assessment_type,
+        status=assessment.status.value if hasattr(assessment.status, 'value') else assessment.status,
+        due_at=assessment.due_at,
+        total_marks=assessment.total_marks,
+        created_by=assessment.created_by,
+        created_at=assessment.created_at,
+        updated_at=assessment.updated_at,
+        question_count=0
+    )
+
+
+@router.patch("/assessments/{assessment_id}", response_model=AssessmentResponse)
+async def update_assessment(
+    assessment_id: UUID,
+    data: AssessmentUpdate,
+    current_user: User = Depends(require_roles("college_admin")),
+    service: CollegeAdminService = Depends(get_service)
+):
+    """Update an assessment."""
+    college_id = current_user.college_id
+    if college_id is None:
+        raise HTTPException(status_code=400, detail="No college assigned to this user")
+    
+    assessment = await service.get_assessment_by_id(assessment_id, college_id)
+    if not assessment:
+        raise HTTPException(status_code=404, detail="Assessment not found")
+    
+    if assessment.status != "draft":
+        raise HTTPException(status_code=400, detail="Cannot edit assessment in current status")
+    
+    assessment = await service.update_assessment(
+        assessment=assessment,
+        title=data.title,
+        description=data.description,
+        assessment_type=data.assessment_type,
+        due_at=data.due_at,
+        total_marks=data.total_marks
+    )
+    
+    return AssessmentResponse(
+        id=assessment.id,
+        college_id=assessment.college_id,
+        title=assessment.title,
+        description=assessment.description,
+        assessment_type=assessment.assessment_type.value if hasattr(assessment.assessment_type, 'value') else assessment.assessment_type,
+        status=assessment.status.value if hasattr(assessment.status, 'value') else assessment.status,
+        due_at=assessment.due_at,
+        total_marks=assessment.total_marks,
+        created_by=assessment.created_by,
+        created_at=assessment.created_at,
+        updated_at=assessment.updated_at,
+        question_count=len(assessment.questions) if assessment.questions else 0
+    )
+
+
+@router.delete("/assessments/{assessment_id}", status_code=204)
+async def delete_assessment(
+    assessment_id: UUID,
+    current_user: User = Depends(require_roles("college_admin")),
+    service: CollegeAdminService = Depends(get_service)
+):
+    """Soft delete an assessment."""
+    college_id = current_user.college_id
+    if college_id is None:
+        raise HTTPException(status_code=400, detail="No college assigned to this user")
+    
+    assessment = await service.get_assessment_by_id(assessment_id, college_id)
+    if not assessment:
+        raise HTTPException(status_code=404, detail="Assessment not found")
+    
+    if assessment.submissions and len(assessment.submissions) > 0:
+        raise HTTPException(status_code=400, detail="Cannot delete assessment with submissions")
+    
+    await service.delete_assessment(assessment)
+
+
+@router.post("/assessments/{assessment_id}/publish", response_model=AssessmentResponse)
+async def publish_assessment(
+    assessment_id: UUID,
+    current_user: User = Depends(require_roles("college_admin")),
+    service: CollegeAdminService = Depends(get_service)
+):
+    """Publish an assessment."""
+    college_id = current_user.college_id
+    if college_id is None:
+        raise HTTPException(status_code=400, detail="No college assigned to this user")
+    
+    assessment = await service.get_assessment_by_id(assessment_id, college_id)
+    if not assessment:
+        raise HTTPException(status_code=404, detail="Assessment not found")
+    
+    if assessment.status != "draft":
+        raise HTTPException(status_code=400, detail="Only draft assessments can be published")
+    
+    assessment = await service.publish_assessment(assessment)
+    
+    return AssessmentResponse(
+        id=assessment.id,
+        college_id=assessment.college_id,
+        title=assessment.title,
+        description=assessment.description,
+        assessment_type=assessment.assessment_type.value if hasattr(assessment.assessment_type, 'value') else assessment.assessment_type,
+        status=assessment.status.value if hasattr(assessment.status, 'value') else assessment.status,
+        due_at=assessment.due_at,
+        total_marks=assessment.total_marks,
+        created_by=assessment.created_by,
+        created_at=assessment.created_at,
+        updated_at=assessment.updated_at,
+        question_count=len(assessment.questions) if assessment.questions else 0
+    )
+
+
+@router.post("/assessments/{assessment_id}/close", response_model=AssessmentResponse)
+async def close_assessment(
+    assessment_id: UUID,
+    current_user: User = Depends(require_roles("college_admin")),
+    service: CollegeAdminService = Depends(get_service)
+):
+    """Close an assessment."""
+    college_id = current_user.college_id
+    if college_id is None:
+        raise HTTPException(status_code=400, detail="No college assigned to this user")
+    
+    assessment = await service.get_assessment_by_id(assessment_id, college_id)
+    if not assessment:
+        raise HTTPException(status_code=404, detail="Assessment not found")
+    
+    if assessment.status != "published":
+        raise HTTPException(status_code=400, detail="Only published assessments can be closed")
+    
+    assessment = await service.close_assessment(assessment)
+    
+    return AssessmentResponse(
+        id=assessment.id,
+        college_id=assessment.college_id,
+        title=assessment.title,
+        description=assessment.description,
+        assessment_type=assessment.assessment_type.value if hasattr(assessment.assessment_type, 'value') else assessment.assessment_type,
+        status=assessment.status.value if hasattr(assessment.status, 'value') else assessment.status,
+        due_at=assessment.due_at,
+        total_marks=assessment.total_marks,
+        created_by=assessment.created_by,
+        created_at=assessment.created_at,
+        updated_at=assessment.updated_at,
+        question_count=len(assessment.questions) if assessment.questions else 0
+    )
+
+
+@router.get("/dashboard/assessment-stats", response_model=AssessmentStats)
+async def get_assessment_stats(
+    current_user: User = Depends(require_roles("college_admin")),
+    service: CollegeAdminService = Depends(get_service)
+):
+    """Get assessment statistics for the college."""
+    college_id = current_user.college_id
+    if college_id is None:
+        raise HTTPException(status_code=400, detail="No college assigned to this user")
+    
+    stats = await service.get_assessment_stats(college_id)
+    return AssessmentStats(**stats)

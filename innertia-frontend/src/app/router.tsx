@@ -49,6 +49,8 @@ import { CollegeSettingsPage } from '../pages/college_admin/CollegeSettingsPage'
 import { RoleFeaturesPage } from '../pages/college_admin/RoleFeaturesPage';
 import { CollegeAuditLogsPage } from '../pages/college_admin/CollegeAuditLogsPage';
 import { CollegeUserBulkUpload } from '../pages/college_admin/CollegeUserBulkUpload';
+import CollegeExaminationsPage from '../pages/college_admin/CollegeExaminationsPage';
+import CollegeAssessmentsPage from '../pages/college_admin/CollegeAssessmentsPage';
 
 // Staff Pages
 import { StaffDashboard } from '../pages/staff/StaffDashboard';
@@ -144,6 +146,8 @@ const CollegeAdminRoutes = () => (
       <Route path="role-features" element={<RoleFeaturesPage />} />
       <Route path="audit-logs" element={<CollegeAuditLogsPage />} />
       <Route path="users/bulk-upload" element={<CollegeUserBulkUpload />} />
+      <Route path="examinations" element={<CollegeExaminationsPage />} />
+      <Route path="assessments" element={<CollegeAssessmentsPage />} />
     </Routes>
   </AdminLayout>
 );

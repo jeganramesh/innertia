@@ -117,11 +117,11 @@ export const FacultyDashboard = () => {
       <Section>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div className="bg-[#f5f5f7] rounded-2xl p-5">
-            <p className="text-3xl font-semibold text-[#1d1d1f]">{dashboardData?.total_classes || 0}</p>
+            <p className="text-3xl font-semibold text-[#1d1d1f]">{dashboardData?.stats?.total_classes || 0}</p>
             <p className="text-sm text-[#86868b] mt-1">Total Classes</p>
           </div>
           <div className="bg-[#f5f5f7] rounded-2xl p-5">
-            <p className="text-3xl font-semibold text-[#1d1d1f]">{dashboardData?.total_students || 0}</p>
+            <p className="text-3xl font-semibold text-[#1d1d1f]">{dashboardData?.stats?.total_students || 0}</p>
             <p className="text-sm text-[#86868b] mt-1">Total Students</p>
           </div>
           <div className="bg-[#f5f5f7] rounded-2xl p-5">

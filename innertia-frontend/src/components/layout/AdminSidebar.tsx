@@ -15,7 +15,10 @@ import {
   Shield,
   Upload,
   FileText,
-  Building2
+  Building2,
+  ClipboardList,
+  GraduationCap,
+  Folder
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -148,6 +151,10 @@ export const AdminSidebar = memo(({ className, onCollapseChange }: AdminSidebarP
     { icon: <Users size={20} />, label: 'Users', path: '/college-admin/users' },
     { icon: <Upload size={20} />, label: 'Bulk Upload', path: '/college-admin/users/bulk-upload' },
     { icon: <BookOpen size={20} />, label: 'Classes', path: '/college-admin/classes' },
+    { icon: <GraduationCap size={20} />, label: 'Sessions', path: '/college-admin/sessions' },
+    { icon: <GraduationCap size={20} />, label: 'Examinations', path: '/college-admin/examinations' },
+    { icon: <ClipboardList size={20} />, label: 'Assessments', path: '/college-admin/assessments' },
+    { icon: <FileText size={20} />, label: 'Reports', path: '/college-admin/reports' },
     { icon: <Shield size={20} />, label: 'Role Features', path: '/college-admin/role-features' },
     { icon: <FileText size={20} />, label: 'Audit Logs', path: '/college-admin/audit-logs' },
   ];

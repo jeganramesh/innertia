@@ -1,6 +1,5 @@
 """add college settings
 
-Revision ID: 008
 Revises: 007_add_college_domain
 Create Date: 2026-03-01 14:13:00.000000
 
@@ -12,8 +11,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '008'
-down_revision: Union[str, None] = '007'
+revision: str = '008_add_college_settings'
+down_revision: Union[str, None] = '007_add_college_domain'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

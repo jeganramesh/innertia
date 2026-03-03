@@ -68,12 +68,18 @@ services:
       - backend
     env_file:
       - innertia-frontend/.env
+    environment:
+      - VITE_API_URL=http://backend:8000
+      - VITE_API_BASE_URL=http://backend:8000
+      - VITE_API_PROXY_TARGET=http://backend:8000
     volumes:
       - ./innertia-frontend:/app
       - /app/node_modules
     command: npm run dev -- --host --port 3000
     networks:
       - innertia_network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     stdin_open: true
     tty: true
 

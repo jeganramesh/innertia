@@ -18,6 +18,9 @@ const FEATURE_LABELS: Record<string, string> = {
   'ai_notes': 'AI Notes',
   'placement_module': 'Placement Module',
   'assessment_module': 'Assessment Module',
+  'exam_module': 'Examinations',
+  'exam_create': 'Create Exams',
+  'exam_view': 'View Exams',
   'advanced_reports': 'Advanced Reports',
   'live_session_lock': 'Live Session Lock',
   'student_portal': 'Student Portal',
@@ -77,9 +80,10 @@ export const RoleFeaturesPage = () => {
       });
       toast.success(`${featureKey} ${!currentEnabled ? 'enabled' : 'disabled'} for ${role}`);
       loadRoleFeatures();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Failed to toggle role feature:', error);
-      toast.error(error.response?.data?.detail || 'Failed to toggle role feature');
+      const axiosError = error as { response?: { data?: { detail?: string } } };
+      toast.error(axiosError.response?.data?.detail || 'Failed to toggle role feature');
     }
   };
 
@@ -95,7 +99,7 @@ export const RoleFeaturesPage = () => {
     <div className="space-y-6">
       <PageHeader
         title="Role Feature Permissions"
-        description="Configure which features each role can access within your college"
+        subtitle="Configure which features each role can access within your college"
       />
 
       <Card>

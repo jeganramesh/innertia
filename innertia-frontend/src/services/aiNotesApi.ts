@@ -64,11 +64,12 @@ export interface AINoteList {
 }
 
 // API base URL
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_V1_PREFIX = '/api/v1';
 
 // Create axios instance
 const aiNotesClient = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: `${API_BASE_URL}${API_V1_PREFIX}`,
   timeout: 120000, // 2 minute timeout for AI generation
   headers: {
     'Content-Type': 'application/json',
